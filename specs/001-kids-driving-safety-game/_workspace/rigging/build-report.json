@@ -1,0 +1,70 @@
+{
+  "blender": "5.2.2 LTS",
+  "source_sha256": {
+    "chicken-guy": "85d4f3671a9383f810a53bbac55da34b890e3eb0f16769c63d6643a1a436fae3",
+    "cool-banana-guy": "d12abda5c80a2fd9988c6a50be941134e765d673ca2aa8d7c52e324b49da07c6",
+    "turtle": "a068045dde8482f7781eb6b1433c827db1762d051395f15899ad987431df60fc"
+  },
+  "characters": {
+    "cool-banana-guy": {
+      "bones": 16,
+      "vertices": 3054,
+      "clips": [
+        "Idle",
+        "RaiseHand",
+        "LookLeft",
+        "LookRight",
+        "Sit"
+      ],
+      "deformation_max_m": {
+        "Pelvis": 0.58032,
+        "Spine": 0.494549,
+        "Head": 0.303362,
+        "UpperArm.L": 0.319581,
+        "Forearm.L": 0.202717,
+        "Hand.L": 0.036872,
+        "UpperArm.R": 0.319582,
+        "Forearm.R": 0.20272,
+        "Hand.R": 0.036883,
+        "Thigh.L": 0.293512,
+        "Shin.L": 0.15697,
+        "Foot.L": 0.051547,
+        "Thigh.R": 0.293512,
+        "Shin.R": 0.156966,
+        "Foot.R": 0.051518
+      },
+      "bytes": 650360,
+      "sha256": "f7592cb93e340a6ceeaf138d34d4673d11a3212532f8d911138690e8b2ee0f5a"
+    },
+    "turtle": {
+      "bones": 16,
+      "vertices": 1826,
+      "clips": [
+        "Idle",
+        "RaiseHand",
+        "LookLeft",
+        "LookRight",
+        "Sit"
+      ],
+      "deformation_max_m": {
+        "Pelvis": 0.675345,
+        "Spine": 0.489227,
+        "Head": 0.329098,
+        "UpperArm.L": 0.203854,
+        "Forearm.L": 0.115991,
+        "Hand.L": 0.046078,
+        "UpperArm.R": 0.203854,
+        "Forearm.R": 0.115991,
+        "Hand.R": 0.046078,
+        "Thigh.L": 0.194546,
+        "Shin.L": 0.107059,
+        "Foot.L": 0.051012,
+        "Thigh.R": 0.194546,
+        "Shin.R": 0.107059,
+        "Foot.R": 0.051012
+      },
+      "bytes": 145472,
+      "sha256": "c08f4dd1b5d28b425b55e275a5083e24a55d055381712b9ca99d4d85bd81ffd9"
+    }
+  }
+}

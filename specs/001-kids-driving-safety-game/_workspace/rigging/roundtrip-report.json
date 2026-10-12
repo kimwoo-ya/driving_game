@@ -1,0 +1,57 @@
+{
+  "cool-banana-guy": {
+    "sha256": "f7592cb93e340a6ceeaf138d34d4673d11a3212532f8d911138690e8b2ee0f5a",
+    "bytes": 650360,
+    "skins": 1,
+    "animations": [
+      "Idle",
+      "RaiseHand",
+      "LookLeft",
+      "LookRight",
+      "Sit"
+    ],
+    "roundtrip_max_displacement_m": {
+      "Idle": 0.0,
+      "RaiseHand": 1.273157,
+      "LookLeft": 0.135032,
+      "LookRight": 0.135032,
+      "Sit": 0.393522
+    },
+    "weighted_vertices": 3060,
+    "bones": 16
+  },
+  "turtle": {
+    "sha256": "c08f4dd1b5d28b425b55e275a5083e24a55d055381712b9ca99d4d85bd81ffd9",
+    "bytes": 145472,
+    "skins": 1,
+    "animations": [
+      "Idle",
+      "RaiseHand",
+      "LookLeft",
+      "LookRight",
+      "Sit"
+    ],
+    "roundtrip_max_displacement_m": {
+      "Idle": 0.0,
+      "RaiseHand": 0.832648,
+      "LookLeft": 0.170445,
+      "LookRight": 0.170445,
+      "Sit": 0.262698
+    },
+    "weighted_vertices": 1834,
+    "bones": 16
+  },
+  "chicken-guy": {
+    "sha256": "85d4f3671a9383f810a53bbac55da34b890e3eb0f16769c63d6643a1a436fae3",
+    "bytes": 282604,
+    "skins": 2,
+    "animations": [
+      "Armature|Grounded",
+      "Armature|Idle",
+      "Armature|Jump",
+      "Armature|Sprint",
+      "Armature|Walk"
+    ],
+    "original_preserved": true
+  }
+}
