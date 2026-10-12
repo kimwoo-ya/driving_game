@@ -106,7 +106,7 @@
 | 15 | 잘못된 행동 범위 | 6종 각각이 어떤 구간의 `violations`에 1번 이상 | 항상 | SC-010 |
 | 16 | 구간 형식 | `stopZone.toS ≤ stopLineS`, `steps` 1+, `pedestrianView.segment`·`afterStep`이 유효 | 항상 | FR-032, FR-033 |
 | 17 | **사고 장면 방지 거리** | 각 구간에서 보행자 경로(대기 위치 포함)의 모든 점이 그 구간 위반 경계(정지선, 횡단보도의 차 쪽 가장자리, 보도 가장자리)의 **차가 오는 쪽 반대편**에 있고, 경계까지 거리 ≥ 여유(사람 반지름 + 여유, 테스트 상수 1 m 제안). 위반은 후보 위치에서 판정해 차체가 경계를 넘지 않으므로(modules.md 4.4) 이 거리면 차와 보행자가 닿지 않음 | 항상 | FR-036 |
-| 18 | 트랙 | 체크포인트 3+·`arc` 오름차순, `laps ∈ {1,2}`, 출발 칸 4개가 결승선과 1번 체크포인트 사이, `aiProfiles` 3개 | 항상 | FR-058, FR-059 |
+| 18 | 트랙 | 체크포인트 3+·`arc` 오름차순, `laps ∈ {1,2}`, 출발 칸 4개가 결승선과 1번 체크포인트 사이, `aiProfiles` 3개, 복귀 후보 간격 `width / 3 > 4 × DRIVING_SPEC.bodyRadius`, 체크포인트마다 뒤 후보(접선 반대 방향 직선 `5 × bodyRadius`)가 트랙 안(중심선까지 거리 ≤ `width / 2 − bodyRadius`)(data-model.md 7장 "복귀 자세", 빈 후보가 늘 남음) | 항상 | FR-058, FR-059, FR-061 |
 | 19 | 모델 크레딧 | 8 ID마다 `Credit` 1행, 필수 필드 모두 비어 있지 않음, 라이선스가 PRD 표와 같음 | 항상 | FR-088, SC-026 |
 | 20 | 운전 성능 | `DRIVING_SPEC` 값이 모두 유한한 양수, `maxReverseSpeed < maxForwardSpeed`, `stopSnapSpeed < maxReverseSpeed` | 항상 | FR-011, 02 결정 B4 |
 | 21 | 규칙 그림 | `images/rules/<id>.svg` 38/38이 `ASSET_URLS`에 있음 | 완성 | SC-030, FR-070 |

@@ -1,6 +1,6 @@
 # Implementation Plan: 아동용 3D 운전·보행 안전 게임 — 첫 버전
 
-**Branch**: `001-kids-driving-safety-game` (스펙 폴더 이름입니다. Git 브랜치는 만들지 않았고 저장소에 커밋도 아직 없습니다.) | **Date**: 2026-10-12 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-kids-driving-safety-game` (스펙 폴더 이름입니다. Git 브랜치는 만들지 않았습니다. 첫 커밋은 2026-10-12에 만들었습니다(`2739ec0`).) | **Date**: 2026-10-12 | **Spec**: [spec.md](./spec.md)
 
 **Input**: Feature specification from `specs/001-kids-driving-safety-game/spec.md`
 
@@ -92,8 +92,8 @@ driving_game/
 │   ├── main.ts
 │   ├── style.css
 │   ├── app/
-│   │   ├── flow.ts               # 화면 흐름 상태 기계(ScreenState), 겹침 안내
-│   │   ├── session.ts            # RunState, PlaySession
+│   │   ├── flow.ts               # 화면 흐름 상태 기계(ScreenState), 겹침 안내, PlaySession
+│   │   ├── session.ts            # RunState
 │   │   └── loader.ts             # loadRequired, retryFailed, 에셋 URL 표
 │   ├── core/
 │   │   └── loop.ts               # 고정 시간 간격 루프(TICK_HZ, MAX_TICKS_PER_FRAME)
@@ -188,8 +188,8 @@ driving_game/
 |---|---|---|
 | `index.html` | 셸, 부팅 가드(앱 부팅 완료 전 스크립트·CSS 불러오기 실패와 구형 브라우저 구문 오류를 잡아 "다시 시도(새로 고침)" 표시), `<script nomodule>` 안내, viewport 메타 | FR-001, FR-005 |
 | `src/main.ts` | WebGL2 확인 → 렌더러 생성(실패 시 3D 불가 안내) → 저장 읽기 → 로더 → 흐름 시작 → 부팅 가드 해제 | FR-001, FR-005 |
-| `app/flow.ts` | 화면 흐름 상태 기계, 겹침 안내, 연타 방지, step 이벤트를 받아 UI·소리·저장 호출 | FR-008, FR-029, FR-030, FR-047~050, FR-065, FR-071~077, FR-087 |
-| `app/session.ts` | `RunState`(레이싱 열림, 이번 실행 연습별 완료, 조작 익히기 통과, 추가 규칙 순환 위치, 저장 사용 가능 여부, 소리 활성화, 이번 실행의 최고 기록·소리 설정), `PlaySession`(고른 차량·인물) | FR-010, FR-027, FR-050, FR-051, FR-080, FR-091, FR-097 |
+| `app/flow.ts` | 화면 흐름 상태 기계, 겹침 안내, 연타 방지, step 이벤트를 받아 UI·소리·저장 호출, `PlaySession`(고른 차량·인물) | FR-008, FR-029, FR-030, FR-047~050, FR-065, FR-071~077, FR-087 |
+| `app/session.ts` | `RunState`(레이싱 열림, 이번 실행 연습별 완료, 조작 익히기 통과, 추가 규칙 순환 위치, 저장 사용 가능 여부, 소리 활성화, 이번 실행의 최고 기록·소리 설정) | FR-010, FR-027, FR-050, FR-051, FR-080, FR-091, FR-097 |
 | `app/loader.ts` | 필수 GLB 8개 내려받기(바이트 진행률, 정체 시 중단), 실패 파일만 다시 받기, 404면 새로 고침, 소리 파일 백그라운드 로딩(실패 무시), `import.meta.glob` 에셋 URL 표 | FR-002~004, FR-070 |
 | `core/loop.ts` | requestAnimationFrame + 누적기, `TICK_HZ = 60`, `MAX_TICKS_PER_FRAME = 8`, 프레임 간격 상한, 일시정지 중 틱 없음, 재개 시 기준 시각 초기화 | FR-022, FR-071, FR-074 |
 | `input/controls.ts` | 조작 버튼 DOM, 손가락 좌표 표, `pressedButtons`(좌표 기반 판정), `toDriveInput`(브레이크 우선·좌우 동시 직진), 후진·일시정지 1회 이벤트, `releaseAll` | FR-013~017, FR-021 |
@@ -273,7 +273,7 @@ GitHub Pages ─HTTPS 같은 출처─▶ app/loader ─ArrayBuffer─▶ render
                                           └─ArrayBuffer─▶ audio(decodeAudioData) ─▶ AudioBuffer
 localStorage ─문자열─▶ storage/save(parseSave: 항목별 검사·기본값) ─▶ app/session(RunState)
                                                                     ─▶ ui: 레이싱 잠김 그림, 소리 설정, 결과 화면 최고 기록
-선택 화면 ─▶ app/session(PlaySession: 차량 종류, 인물 종류) ─▶ render/models·characters(아이 차 외형 + seats에 탑승객)
+선택 화면 ─▶ app/flow(PlaySession: 차량 종류, 인물 종류) ─▶ render/models·characters(아이 차 외형 + seats에 탑승객)
 터치 ─pointer 이벤트─▶ input/controls(손가락 좌표 표) ─틱마다 pressedButtons─▶ DriveInput
      ─▶ stepVehicle·stepScenario·stepPedestrianView·stepRace ─▶ 다음 상태 + 이벤트
            상태 ─▶ render(위치·카메라·Chicken Guy 자세), ui/hud(전진·후진, 순위, 바퀴, 시간)
@@ -292,7 +292,7 @@ storage/save ─commitSave: 다시 읽기·합치기─▶ localStorage(이 브�
 | 그림(SVG) | 콘텐츠 제작 단계 결과물 | 빌드 때 JS 번들에 인라인(별도 파일·요청 없음) | `ASSET_URLS`의 `data:` URI → UI(`<img>`). 플레이 중 네트워크가 끊겨도 그림이 비지 않음 |
 | 소리(MP3) | 콘텐츠 제작 단계 결과물 | `dist/assets` 해시 파일 | `loadSounds`(백그라운드, 실패 무시) → audio |
 | 저장 3항목 | 게임 이벤트(세 번째 완료, 정상 완주, 소리 변경) | localStorage 키 하나 | `parseSave` → `RunState` → UI |
-| 선택 차량·인물 | 아이의 선택 | 메모리(`PlaySession`, 저장 안 함) | session → render(아이 차, 탑승객) |
+| 선택 차량·인물 | 아이의 선택 | 메모리(`PlaySession`, 저장 안 함) | flow → render(아이 차, 탑승객) |
 | 입력 | 터치 | 메모리 좌표 표(저장 안 함) | controls → step → render·hud |
 | 경기·연습 진행 | step 함수 | 메모리(저장 안 함) | step → flow → UI·audio·storage |
 
@@ -329,7 +329,8 @@ storage/save ─commitSave: 다시 읽기·합치기─▶ localStorage(이 브�
   - 권한: `contents: read`, `pages: write`, `id-token: write`. 동시 실행 그룹: `pages`.
   - 단계: `actions/checkout@v7.0.1` → `actions/setup-node@v7.0.0`(node-version `24`, npm 캐시) → `npm ci` → `npm test` → `npm run build` → `actions/configure-pages@v6.0.0` → `actions/upload-pages-artifact@v5.0.0`(path `./dist`) → `actions/deploy-pages@v5.0.1`(environment `github-pages`).
   - 액션 버전 근거는 research.md에 있습니다. CI에는 Playwright를 넣지 않습니다.
-- **사전 조건(사용자 작업)**: 저장소는 public이고 Pages가 꺼져 있습니다(`has_pages: false`). Settings → Pages → Source를 "GitHub Actions"로 켜야 합니다. 저장소에 아직 커밋이 없습니다.
+- **사전 조건(사용자 작업)**: 저장소는 public이고 Pages가 꺼져 있습니다(`has_pages: false`). Settings → Pages → Source를 "GitHub Actions"로 켜야 합니다. 첫 커밋은 있습니다(2026-10-12).
+- **공개 시점**: 크레딧이 공개 배포의 필수 조건(spec User Story 8)이므로 워크플로 파일은 단계 1에서 만들어 로컬로만 확인하고, 첫 `main` 푸시(= 첫 공개 배포)는 크레딧 화면이 갖춰진 뒤 합니다(사용자 결정 2026-10-12). 트리거가 `main` 푸시라 그 전에는 원격 `main`에 푸시하지 않습니다.
 
 ## 오류 처리와 보안·개인정보
 
@@ -388,7 +389,7 @@ Playwright WebKit은 iOS Safari와 같지 않습니다. WebKit headless에서 We
 | SC-016 | 저장·복원 왕복 | 새로 고침 후 3항목 복원 | | |
 | SC-017 | 저장 실패 시 `RunState` 값 사용 | localStorage 예외 환경에서 시작~완주, 안내 1회 | | |
 | SC-020 | 안내 하나만 재생·배경음 낮춤 정책 | AudioContext 생성이 시작 버튼 뒤에만 | 실제 청취 | |
-| SC-021 | 보행자 시점 안내가 음성 완료를 기다리지 않음 | 소리 파일 경로 차단 후 완주 | 무음 상태 | |
+| SC-021 | 보행자 시점 안내가 음성 완료를 기다리지 않음 | 소리 파일 경로 차단 후 조작 익히기 진입(일부) | 무음 상태와 음원 전부 차단 상태 각각 시작~레이싱 완주 | |
 | SC-022 | | `/driving_game/` 로딩, 새로 고침, GLB 실패 → 다시 시도, 404 → 새로 고침, 3D 불가 안내 | 실제 공개 주소 | |
 | SC-023 | | 가로 viewport 여러 개에서 조작 버튼끼리, 그리고 안전 영역과 겹치지 않음, 스크린샷 | 선정 기기 전체 | |
 | SC-024 | | | `?perf` 측정 기록 | |
@@ -437,11 +438,11 @@ SC-024 목표 수치는 초기 기기 점검에서 정합니다. 아래 값은 �
 
 | 단계 | 내용 | 완료 확인 |
 |---|---|---|
-| 0. 준비 — **사용자 승인 필요** | `package.json`·잠금 파일·설정 파일 생성과 의존성 설치(`npm install`), 미준비 차량 GLB 5개 내려받기와 `SHA256SUMS` 확장(캐릭터 3종은 준비됨), Playwright 브라우저 설치(`npx playwright install chromium webkit`), 사용자의 Pages 소스 "GitHub Actions" 켜기, 첫 커밋·`main` 푸시 | `npm ci`, `shasum -a 256 -c` |
-| 1. 코드 기반 | 부팅·로더·3D 불가·로딩 실패, stage·models, **모델 렌더링 점검**(8종 방향·크기, 왜건 음영, 버기 합치기, 차종별 탑승객 좌석 보임, Chicken Guy 클립과 `Head`·`Hand` 자세 시제품), 루프, 입력, 차량 sim·충돌, 화면 흐름(시작·선택·연습 목록 뼈대), 일시정지·생명주기·세로 안내, 저장 모듈, **배포 파이프라인 먼저 연결**(하위 경로 확인) | `npm test`, `npm run build`, `npm run test:e2e`(하위 경로·3D 불가·저장 불가), 실제 배포 주소 |
+| 0. 준비 — **사용자 승인 필요** | `package.json`·잠금 파일·설정 파일 생성과 의존성 설치(`npm install`), 미준비 차량 GLB 5개 내려받기와 `SHA256SUMS` 확장(캐릭터 3종은 준비됨), Playwright 브라우저 설치(`npx playwright install chromium webkit`), 사용자의 Pages 소스 "GitHub Actions" 켜기(첫 커밋은 완료, `main` 푸시는 단계 4의 크레딧 뒤) | `npm ci`, `shasum -a 256 -c` |
+| 1. 코드 기반 | 부팅·로더·3D 불가·로딩 실패, stage·models, **모델 렌더링 점검**(8종 방향·크기, 왜건 음영, 버기 합치기, 차종별 탑승객 좌석 보임, Chicken Guy 클립과 `Head`·`Hand` 자세 시제품), 루프, 입력, 차량 sim·충돌, 화면 흐름(시작·선택·연습 목록 뼈대), 일시정지·생명주기·세로 안내, 저장 모듈, **배포 워크플로 파일 먼저 준비**(하위 경로는 로컬 미리보기로 확인, 공개 배포는 크레딧 뒤) | `npm test`, `npm run build`, `npm run test:e2e`(하위 경로·3D 불가·저장 불가), 로컬 미리보기 하위 경로 |
 | 2. 안전 연습 | 조작 익히기, 연습 판정 엔진(자리표시 마을 배치로 1개 상황 → 3개), 신호·Chicken Guy 보행자, 위험 직전 멈춤, 보행자 시점 안내 타임라인(자리표시 카드), 규칙 순환, 레이싱 열림 저장 | SC-008·009·010·031 Vitest, 플레이 확인 |
 | 3. 레이싱 | 트랙 데이터(자리표시), 체크포인트·바퀴·순위, 컴퓨터 차량, 접촉·끼임 복귀, 카운트다운, 결과·최고 기록, 재도전 | SC-012~015 Vitest, SC-011 대리 지표 |
-| 4. 소리·저장 마무리 | 오디오 엔진(잠금 해제, 안내 하나만, 배경음 낮춤, 일시정지·재개, 설정), 저장 불가 안내 흐름 | SC-016~021 |
+| 4. 소리·저장 마무리 | 오디오 엔진(잠금 해제, 안내 하나만, 배경음 낮춤, 일시정지·재개, 설정), 저장 불가 안내 흐름, 크레딧 화면, **첫 공개 배포**(크레딧 뒤, 사용자 승인 후 `main` 푸시) | SC-016~021, 실제 배포 주소 |
 | 5. 콘텐츠 제작(별도 단계) | 마을 장면 요소(FR-092), 규칙 38문구 그림, 안내 음성, 효과음, 배경음 선정·사용조건 확인, UI 그림, 다른 차 탑승객 배정, 크레딧 최종. **사용자 결정 B15 필요** | 콘텐츠 Vitest(SC-030), 검토 기록(SC-026·027·030·031) |
 | 6. 점검 | 초기 기기 점검(대표 기기 선정, SC-023·024 목표 확정), 트랙 플레이 점검(바퀴 수·5분, SC-011), 실제 기기 시험(SC-003~007, SC-032), 어린이 관찰(SC-028) | 기록 |
 
@@ -499,6 +500,6 @@ spec·PRD·용어집에 이미 반영되었습니다(spec.md Clarifications "Ses
 | O7 | 실제 기기에서만 확인 가능한 미확인 사항: iOS Safari의 확대·두 번 탭 차단 동작, 화면 잠금 때 `visibilitychange` 발생, AudioContext `interrupted` 뒤 재개, MP3 디코딩, 시스템 제스처의 터치 취소, iOS 컨텍스트 손실 복구, 새로 고침 때 캐시된 `index.html`을 다시 확인하는지 | 단계 1·6 실제 기기 |
 | O8 | 도구 동작 확인: Playwright WebKit headless의 WebGL2, `vite preview`의 `base` 하위 경로 제공, TypeScript 7.0.2와 tsconfig 조합 | 단계 1 첫 태스크 |
 | O9 | Vite 8.3.3 이상으로 올리기(2026-10-20 이후, 개발 서버 보안 수정) | 실제 기기에서 개발 서버를 열기 전 |
-| O10 | GitHub Pages 켜기, 첫 커밋·푸시(사용자 작업) | 단계 0 |
+| O10 | GitHub Pages 켜기(사용자 작업). 첫 커밋은 완료(2026-10-12). 첫 `main` 푸시는 크레딧 화면 뒤 | 단계 0(켜기), 단계 4(푸시) |
 | O11 | GitHub Pages 캐시 헤더(`max-age=600`)의 공식 문서 근거(실측만 있음) | 참고용, 동작에는 부팅 가드로 대비 |
 | O12 | **해결(사용자 결정 2026-10-12)**: 시작 버튼보다 잠긴 레이싱을 먼저 누르면 소리 활성화 전이므로 잠김 안내를 그림으로만 보여 줌(FR-066 우선, spec FR-048에 반영) | — |

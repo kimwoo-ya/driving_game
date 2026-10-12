@@ -45,6 +45,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 | D5 | 콘텐츠 "완성" 검사(content-data 4장 #8·#21·#22·#23)는 콘텐츠 단계 시작 때 `it.skip`으로 넣고 해당 콘텐츠 태스크에서 하나씩 켬 | content-data.md "켜는 시점은 tasks 단계" |
 | D6 | 세 안전 상황의 자리표시 데이터를 기반 단계에 두고 US2에서 실제 구간으로 교체 | 조작 익히기 시작 위치(`SCENARIOS[0].segments[0].start`)와 실행 상태 타입이 상황 ID를 씀 |
 | D7 | 연습·보행자 시점 안내의 타입 선언만 기반 단계에 먼저 둠(T020·T021) | 조작 익히기 이벤트 타입이 `ScenarioEvent`에 기댐(modules.md 4.3) |
+| D8 | 태스크당 1~2파일 규칙에서 점검 기록 파일(`records/*.md`)은 세지 않고, 같은 종류의 에셋 묶음(GLB 여러 개 + `SHA256SUMS`, 규칙 그림 38장, 음성 파일 묶음 등)은 한 단위로 셈 | analyze X-08, 사용자 결정 2026-10-12 |
 
 ---
 
@@ -64,21 +65,21 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 
 ## Phase 2: Foundational (단계 1 일부 — 모든 이야기의 선행)
 
-**Purpose**: 루프·주행·콘텐츠 타입·저장·실행 상태·로더·렌더러·화면 흐름 골격·배포. 부팅부터 시작 화면까지 열립니다.
+**Purpose**: 루프·주행·콘텐츠 타입·저장·실행 상태·로더·렌더러·화면 흐름 골격·배포 워크플로 파일. 부팅부터 시작 화면까지 열립니다(공개 배포는 크레딧 뒤 T093).
 
 **⚠️ CRITICAL**: 이 단계가 끝나기 전에는 사용자 이야기 작업을 시작하지 않습니다.
 
 - [ ] T008 [P] `src/core/loop.ts`: modules.md 1장(`TICK_HZ = 60`, `MAX_TICKS_PER_FRAME = 8`, `ticksForFrame`, `startLoop`, `setTicking`; 모듈 최상위에서 `window`·`performance`·`requestAnimationFrame`을 건드리지 않음). 테스트: `tests/unit/loop.test.ts` 신설 — 프레임 간격 0.25초 자르기, 틱 8개 상한과 남은 누적 버림, 8.3/16.7/33.3 ms·불규칙 간격으로 같은 시간을 돌리면 총 틱 수가 같음(FR-022, FR-074). 검증: `npm test -- tests/unit/loop.test.ts`
-- [ ] T009 [P] `src/content/vehicles.ts`(`VehicleKindId`, `SeatDef`, `VehicleKind`, `VEHICLES` 5종 순서 buggy·jeep·truck·wagon·banana-car, 한국어 label, `yawDeg` 자리값 0, `seats` 자리값 1개, 성능 필드 없음)와 `src/content/characters.ts`(`CharacterKindId`, `CharacterPose`, `CharacterKind`, `CHARACTERS` 3종: chicken-guy `clips: { idle: 'Armature|Idle', walk: 'Armature|Walk' }`, cool-banana-guy·turtle `clips: { idle: 'Idle' }`·`yawDeg: 0`) 생성. 형식은 `as const satisfies`(content-data.md 머리말). 근거: data-model.md 2.1, assets.md 3·4장(리깅 수정본). 타입·데이터만이라 테스트는 T010. 검증: `npm run typecheck`
+- [ ] T009 `src/content/vehicles.ts`(`VehicleKindId`, `SeatDef`, `VehicleKind`, `VEHICLES` 5종 순서 buggy·jeep·truck·wagon·banana-car, 한국어 label, `yawDeg` 자리값 0, `seats` 자리값 1개, 성능 필드 없음)와 `src/content/characters.ts`(`CharacterKindId`, `CharacterPose`, `CharacterKind`, `CHARACTERS` 3종: chicken-guy `clips: { idle: 'Armature|Idle', walk: 'Armature|Walk' }`, cool-banana-guy·turtle `clips: { idle: 'Idle' }`·`yawDeg: 0`) 생성. 형식은 `as const satisfies`(content-data.md 머리말). 근거: data-model.md 2.1, assets.md 3·4장(리깅 수정본). 선행: T011(`SeatDef.pos`의 `Vec3`는 `src/sim/vehicle.ts` 소속, modules.md 12장 — 이 파일에 따로 선언하지 않고 `import type`). 타입·데이터만이라 테스트는 T010. 검증: `npm run typecheck`
 - [ ] T010 `tests/unit/content.test.ts` 신설 — content-data.md 4장 #11(차량 5·인물 3 ID가 타입과 일치), #13(차량마다 `seats.length ≥ 1`, `height > 0`), #14 데이터 부분(chicken-guy는 `Armature|Idle`·`Armature|Walk`, 나머지 둘은 `Idle`; GLB 안 실제 존재 확인은 T023). 파일: `tests/unit/content.test.ts`. 검증: `npm test -- tests/unit/content.test.ts`
 - [ ] T011 `src/sim/vehicle.ts`: modules.md 3.1(`Vec2`, `Vec3`, `Pose`, `Gear`, `DriveInput`, `DriveState`, `DrivingSpec`, `DRIVING_SPEC` 자리값, `stepVehicle`, `requestGearToggle`, `restingAt`; 차종 매개변수 없음, 무작위·시각 없음). 테스트: `tests/unit/vehicle.test.ts` 신설 — 액셀·브레이크 동시 = 브레이크, steer [−1, 1] 자르기, 페달을 떼면 감속하다 `stopSnapSpeed` 아래에서 정확히 0, 방향별 최고 속도 한도, 정지 중 전환 20회 연타 20/20·주행 중 20회 0/20(SC-004), 거절 요청을 기억하지 않음(FR-018), `restingAt`은 전진·정지(FR-019), SC-002: 틱 번호 입력 스크립트를 `ticksForFrame`로 프레임 간격 4종(8.3/16.7/33.3 ms·불규칙)에 돌려 최고속도·정지 거리·회전 반경·후진 속도·기준 구간 통과 틱이 `toEqual` 완전 일치. 검증: `npm test -- tests/unit/vehicle.test.ts`
 - [ ] T012 `tests/unit/content.test.ts`에 #20(`DRIVING_SPEC` 값 모두 유한 양수, `maxReverseSpeed < maxForwardSpeed`, `stopSnapSpeed < maxReverseSpeed`) 1건 추가. 검증: `npm test -- tests/unit/content.test.ts`
 - [ ] T013 `src/content/town.ts`(`TownDef`, `Rect`, `AreaId`, `SignalId`, `SignalDef`, `SceneElementId` 12종, `ScenePropPlacement`, `TOWN`)와 `src/content/scenarios.ts`(`ScenarioDef`, `ScenarioId`, `SegmentDef`, `SafetyActionStep`, `ActorPlan`(잠정 형식), `PedestrianViewDef`, `ViolationKind` 6종, `RouteIssue`, `SCENARIOS` 3개 순서 signal-wait·crossing-check·turning-car) 생성. 데이터는 자리표시(D6): 기본 도형 마을 한 구역(도로·보도·횡단보도·건물 구역, 차량·보행자 신호 1개씩, `props: []`), signal-wait는 연습 엔진을 시험할 수 있는 구간 1개(정지선·정지 범위·steps stop → wait(vehicleGreen) → go·violations(overStopLine, ranRed, earlyStart, enteredSidewalk)·ActorPlan·pedestrianView), 나머지 둘은 구간 1개짜리 자리표시(T053·T054에서 교체). 근거: data-model.md 2.1, content-data.md 2장. 검증: `npm run typecheck`
 - [ ] T014 `tests/unit/content.test.ts`에 #16(구간 형식: `stopZone.toS ≤ stopLineS`, steps 1개 이상, `pedestrianView.segment`·`afterStep`이 실제 구간·단계를 가리킴) 1건 추가. 검증: `npm test -- tests/unit/content.test.ts`
 - [ ] T015 `src/content/rules.ts`(`SafetyRule`, `RuleId`, `PictureElementId`, `SAFETY_RULES` 38행: data-model.md 6.2 표의 순서·scenario·tier·sceneElements·pictureElements·weather, `text`는 spec.md "보행 안전 규칙 배정" 표 원문, `researchIds`, 정해진 poses A11 = lookLeft·lookRight·lookLeft, A14-A15 = raiseHand, A19-A20 = walk, `durationTicks` 자리값) 생성 + `tests/unit/content.test.ts`에 #1~#7, #9 8건 추가(규칙 38·중복 0, researchIds 합집합 41, 상황별 핵심·추가 4·12/5·7/3·7, 네 행동 core, 횡단 다섯 단계 순서, 핵심 poses에 lookLeft·lookRight·raiseHand, 그림 전용 규칙 정확히 A2·A25·A26·B13·B14, durationTicks 정수 > 0·introTicks ≥ 0). 파일: `src/content/rules.ts`, `tests/unit/content.test.ts`. 검증: `npm test -- tests/unit/content.test.ts`
-- [ ] T016 [P] `src/storage/save.ts`: storage.md 전체(`driving_game:save`, 시험 키 `driving_game:probe`, `MAX_RECORD_CS`, `SoundSettings`, `BestRecord`, `SaveDataV1`, `parseSave`, `loadSave`, `commitSave`; 셋 다 던지지 않음; 전역 `localStorage`는 try 안에서만). 테스트: `tests/unit/save.test.ts` 신설(`vi.stubGlobal('localStorage', 가짜)`) — storage.md 6장 손상 6종과 경계 6건(SC-018), 7장 두 탭 3건(SC-019), 5장 실패(getter `SecurityError` → `ok: false`, `setItem` `QuotaExceededError` → `false`), 저장·복원 왕복 3항목(SC-016), 완주 기록 5개를 차례로 저장하면 저장값 = 최솟값(SC-015). 검증: `npm test -- tests/unit/save.test.ts`
+- [ ] T016 [P] `src/storage/save.ts`: storage.md 전체(`driving_game:save`, 시험 키 `driving_game:probe`, `MAX_RECORD_CS`, `SoundSettings`, `BestRecord`, `SaveDataV1`, `parseSave`, `loadSave`, `commitSave`; 셋 다 던지지 않음; 전역 `localStorage`는 try 안에서만). 테스트: `tests/unit/save.test.ts` 신설(`vi.stubGlobal('localStorage', 가짜)`) — storage.md 6장 손상 6종과 경계 6건(SC-018), 7장 두 탭 중 2·3번째 2건(SC-019 일부; 첫 번째 `finishResult` 사례는 T073), 5장 실패(getter `SecurityError` → `ok: false`·`data` 기본값, 읽기는 되고 시험 쓰기 `setItem` 예외 → `ok: false`·`data`는 읽은 값, `commitSave`의 `setItem` `QuotaExceededError` → `false`), 저장·복원 왕복 3항목(SC-016), 완주 기록 5개를 차례로 저장하면 저장값 = 최솟값(SC-015). 검증: `npm test -- tests/unit/save.test.ts`
 - [ ] T017 `src/content/track.ts`(`TrackDef`, `Checkpoint`, `AiProfile`, `TRACK` 자리표시: id `'main'`, revision 1, laps 2, 닫힌 고리 중심선, width, 체크포인트 3개 이상·arc 오름차순·0번 결승선, 출발 칸 4개는 결승선 뒤 첫 구간, playerSlot, aiProfiles 3개) 생성 + `tests/unit/content.test.ts`에 #18 1건 추가. 근거: data-model.md 2.1 TrackDef. 파일: `src/content/track.ts`, `tests/unit/content.test.ts`. 검증: `npm test -- tests/unit/content.test.ts`
-- [ ] T018 `src/race/race.ts` 첫 부분: `trackConfigKey`, `formatRecord`(modules.md 6.1). 테스트: `tests/unit/race.test.ts` 신설 — `trackConfigKey(TRACK) === 'main:1:2'`, `formatRecord` 29520 → `4:55.20`, 0 → `0:00.00`, 359999 → `59:59.99`, 360000 → `1:00:00.00`, 반올림 없음(FR-064). 검증: `npm test -- tests/unit/race.test.ts`
+- [ ] T018 `src/race/race.ts` 첫 부분: `trackConfigKey`, `formatRecord`(modules.md 6.1). 테스트: `tests/unit/race.test.ts` 신설 — 테스트용 트랙 값(`{ ...TRACK, id: 'main', revision: 1, laps: 2 }`)으로 `trackConfigKey` = `'main:1:2'`(실제 `TRACK` 값을 고정하지 않아 T115 조정 뒤에도 유지), `formatRecord` 29520 → `4:55.20`, 0 → `0:00.00`, 359999 → `59:59.99`, 360000 → `1:00:00.00`, 반올림 없음(FR-064). 검증: `npm test -- tests/unit/race.test.ts`
 - [ ] T019 `src/app/session.ts`(`RunState`, `createRunState`; data-model.md 2.2 시작값). 테스트: `tests/unit/session.test.ts` 신설 — 기본값, 저장값의 tutorialDone·best·sound 반영, extraCursor 세 상황 0, completedThisRun 빈 집합. 검증: `npm test -- tests/unit/session.test.ts`
 - [ ] T020 타입 골격 1(D7): `src/practice/townActors.ts`에 `SignalState`·`TownPedestrian` 타입만, `src/pedestrianView/pedestrianView.ts`에 `PedestrianViewState`·`PedestrianViewEvent` 타입만 선언(data-model.md 2.2, events.md 3장). 함수는 T043·T045. 동작이 없는 타입 선언이라 테스트 없음. 검증: `npm run typecheck`
 - [ ] T021 타입 골격 2(D7): `src/practice/scenario.ts`에 `IDLE_HINT_TICKS`·`DEMO_AFTER_FAILS`·`EXPLAIN_TICKS`(자리값, plan O5), `HintCue`, `ScenarioAttempt`, `ScenarioEvent`(events.md 2장) 선언. 함수는 T048~T051. 검증: `npm run typecheck`
@@ -89,9 +90,9 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - [ ] T026 [P] `src/ui/screens.ts` 시작 화면(시작 버튼; 글은 `textContent`만; 그림은 D4 규칙)과 `src/style.css` 기본(캔버스 전체 화면, `#ui` 겹침 층, 시스템 글꼴). 파일: `src/ui/screens.ts`, `src/style.css`. 검증: `npm run typecheck`
 - [ ] T027 `src/app/flow.ts` 골격(`Screen`, `ScreenState`, `PlaySession`, `startFlow`: `loading` → `loadRequired` → 8개 `prepareModel` → `start`; 실패하면 `loadFailed`로만 전이(화면·다시 시도는 T089·T090); 화면·겹침이 바뀔 때마다 `document.body.dataset.screen`·`dataset.overlays`; `startLoop(tick, draw)`; `?e2e`면 `window.__e2e.ticks`)와 `src/main.ts`(modules.md 8.4 순서: `dataset.screen = 'boot'` → `createStage`가 null이면 `dataset.screen = 'unsupported'`로 두고 멈춤(안내 화면은 T089·T090) → `loadSave(trackConfigKey(TRACK))` → `createRunState` → `startFlow`; `style.css` import). 파일: `src/app/flow.ts`, `src/main.ts`. 검증: `npm run build` 종료 0
 - [ ] T028 `tests/e2e/boot.spec.ts`: T005의 ①을 "`loading`을 거쳐 `start` 도달"로 바꾸고 2건 추가 — `start`에서 `page.reload()`하면 `loading`부터 다시 `start`(FR-002), 모든 요청의 출처가 테스트 서버·`data:`·`blob:`뿐(FR-085, SC-025 일부). 검증: `npm run test:e2e -- tests/e2e/boot.spec.ts`
-- [ ] T029 **[승인 필요: 커밋·푸시]** `.github/workflows/deploy.yml`(plan "배포": `main` 푸시·`workflow_dispatch`, 권한 contents read·pages write·id-token write, concurrency `pages`, `actions/checkout@v7.0.1` → `actions/setup-node@v7.0.0`(node 24, npm 캐시) → `npm ci` → `npm test` → `npm run build` → `actions/configure-pages@v6.0.0` → `actions/upload-pages-artifact@v5.0.0`(`./dist`) → `actions/deploy-pages@v5.0.1`). 선행: T007, T028. 파일: `.github/workflows/deploy.yml`. 검증: 로컬 `npm ci && npm test && npm run build` 종료 0 → 사용자 승인 뒤 푸시 → Actions 성공 → `curl -sI https://kimwoo-ya.github.io/driving_game/` 200, 공개 주소에서 `start` 도달(quickstart S1-3)
+- [ ] T029 `.github/workflows/deploy.yml`(plan "배포": `main` 푸시·`workflow_dispatch`, 권한 contents read·pages write·id-token write, concurrency `pages`, `actions/checkout@v7.0.1` → `actions/setup-node@v7.0.0`(node 24, npm 캐시) → `npm ci` → `npm test` → `npm run build` → `actions/configure-pages@v6.0.0` → `actions/upload-pages-artifact@v5.0.0`(`./dist`) → `actions/deploy-pages@v5.0.1`) 작성까지만 하고 푸시하지 않음. 크레딧은 공개 배포의 필수 조건이라(spec US8, 사용자 결정 2026-10-12) 첫 공개 배포는 크레딧 뒤 T093에서 함. 트리거가 `main` 푸시이므로 T093 전에는 `main`을 원격에 푸시하지 않음. 선행: T028. 파일: `.github/workflows/deploy.yml`. 검증: 로컬 `npm ci && npm test && npm run build` 종료 0
 
-**Checkpoint**: 하위 경로에서 로딩 → 시작 화면, 배포 파이프라인 연결 완료.
+**Checkpoint**: 하위 경로(로컬 미리보기)에서 로딩 → 시작 화면, 배포 워크플로 파일 준비 완료(공개 배포는 크레딧 뒤 T093).
 
 ---
 
@@ -172,16 +173,16 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 
 **Independent Test**: 완료 기록이 있는 브라우저에서 정상 완주(순위·시간·최고 기록 저장), 접촉·이탈·끼임 복귀, 후진 결승선·역주행 미인정, 약 5분 지나도 종료되지 않음(spec US4). 자동: SC-012~015 Vitest(T068~T073), T078.
 
-- [ ] T068 [P] [US4] `src/race/progress.ts`(`STUCK_TICKS` 자리값, `RaceCar`, `progressValue`, `rankCars`, 체크포인트 통과·복귀 자세 계산 내부 함수; modules.md 6.2, data-model 7장). 테스트: `tests/unit/progress.test.ts` 신설 — 진행도 식(투영을 현재 구간으로 제한), 순위 규칙과 동점(완주 tick → overshoot → 플레이어 → slot, FR-057), 다음 차례 체크포인트만 정방향 인정·결승선 후진 왕복·역방향·안쪽 가로지르기 불인정(SC-013 단위, FR-059), 복귀 자세 진행도 ≤ 복귀 전·겹치지 않는 칸(FR-061). 검증: `npm test -- tests/unit/progress.test.ts`
+- [ ] T068 [P] [US4] `src/race/progress.ts`(`STUCK_TICKS` 자리값, `RaceCar`, `progressValue`, `rankCars`, 체크포인트 통과·복귀 자세 계산 내부 함수; modules.md 6.2, data-model 7장). 테스트(공개 함수만, modules.md 6.2): `tests/unit/progress.test.ts` 신설 — 진행도 식(투영을 현재 구간으로 제한 → 안쪽 가로지르기로 진행도가 늘지 않음, FR-059), 순위 규칙과 동점(완주 tick → overshoot → 플레이어 → slot, FR-057). 체크포인트 통과·복귀 자세 내부 함수는 계약대로 `stepRace`를 거쳐 T071·T072에서 시험. 검증: `npm test -- tests/unit/progress.test.ts`
 - [ ] T069 [P] [US4] `src/sim/collision.ts`에 `blockByTrackWalls`·`separateCars`. 테스트: `tests/unit/collision.test.ts`에 3건 추가 — 벽에서 막고 감속·튕김 없음, 겹친 만큼 떼어 놓기·heading 그대로·touching 표시, 입력 순서대로 결정적(FR-060). 검증: `npm test -- tests/unit/collision.test.ts`
 - [ ] T070 [US4] `src/race/ai.ts` `aiInput`(modules.md 6.3). 테스트: `tests/unit/ai.test.ts` 신설 — `DriveInput`만 반환, 무작위 없음·같은 스냅숏이면 처리 순서와 무관, laneOffset 주행선을 따라감, targetSpeedRatio를 넘으면 액셀을 뗌, reactionTicks 지연, 앞이 막히면 옆 주행선(FR-054, FR-060). 선행: T068. 검증: `npm test -- tests/unit/ai.test.ts`
-- [ ] T071 [US4] `src/race/race.ts` `createRace`·`stepRace` 기본: modules.md 6.1(4대 `restingAt(grid)`, playerSlot, 컴퓨터 외형 = VEHICLES에서 플레이어 차를 뺀 앞 3종, countdown 중 정지·gearTap 무시·초마다 countdownTick, 0이 되는 틱 `go` + 첫 `rankChanged`, running에서 raceTicks + 1, 네 대 같은 `stepVehicle` → `blockByTrackWalls` → `separateCars`, `lapCompleted`, 플레이어 완주 틱 `finished`·`timeCs = Math.round(raceTicks × 100 / TICK_HZ)`·`playerFinished`는 그 틱 마지막, 이후 no-op; events.md 7.2 순서). 테스트: `tests/unit/race.test.ts`에 추가 — 위 항목, 카운트다운 중 누른 액셀이 go 다음 틱부터 반영(FR-017 단서), 재도전 = 새 상태로 모든 값 처음(FR-065), 차종을 바꿔도 같은 입력이면 같은 결과(US4-11) — 6건. 선행: T068~T070. 검증: `npm test -- tests/unit/race.test.ts`
-- [ ] T072 [US4] `src/race/race.ts` 끼임·접촉: `stuckTicks ≥ STUCK_TICKS` → 복귀·`respawned`(완주한 차 제외, 컴퓨터도 같음), touching → `contactSlow` `CONTACT_SLOW_TICKS` 감속. 테스트: `tests/unit/race.test.ts`에 3건 추가 — SC-014 끼임 10회 자동 복귀·재시작 0, SC-013 결승선 후진 왕복 20·역주행 1바퀴·가로지르기·복귀 10회에서 바퀴 증가 0·순위 상승 0, SC-012 30분 이상(108,000틱 이상) 느린 주행 강제 종료 0·시간 = 틱 ÷ 60. 검증: `npm test -- tests/unit/race.test.ts`
-- [ ] T073 [US4] `src/race/race.ts` `finishResult`. 테스트: `tests/unit/race.test.ts`에 4건 추가 — 엄격히 짧을 때만 새 기록(같으면 아님), runBest·storedBest 중 짧은 쪽 기준, `MAX_RECORD_CS` 초과는 후보 제외, 완주 5회의 최솟값 = 최고 기록(SC-015, FR-064). 검증: `npm test -- tests/unit/race.test.ts`
+- [ ] T071 [US4] `src/race/race.ts` `createRace`·`stepRace` 기본: modules.md 6.1(4대 `restingAt(grid)`, playerSlot, 컴퓨터 외형 = VEHICLES에서 플레이어 차를 뺀 앞 3종, countdown 중 정지·gearTap 무시·초마다 countdownTick, 0이 되는 틱 `go` + 첫 `rankChanged`, running에서 raceTicks + 1, 네 대 같은 `stepVehicle` → `blockByTrackWalls` → `separateCars`, `lapCompleted`, 플레이어 완주 틱 `finished`·`timeCs = Math.round(raceTicks × 100 / TICK_HZ)`·`playerFinished`는 그 틱 마지막, 이후 no-op; events.md 7.2 순서). 테스트: `tests/unit/race.test.ts`에 추가 — 위 항목, 카운트다운 중 누른 액셀이 go 다음 틱부터 반영(FR-017 단서), 재도전 = 새 상태로 모든 값 처음(FR-065), 차종을 바꿔도 같은 입력이면 같은 결과(US4-11), 다음 차례 체크포인트만 정방향 인정·결승선 후진 왕복·역방향 불인정(FR-059, progress 내부 함수를 `stepRace`로 시험) — 7건. 선행: T068~T070. 검증: `npm test -- tests/unit/race.test.ts`
+- [ ] T072 [US4] `src/race/race.ts` 끼임·접촉: `stuckTicks ≥ STUCK_TICKS` → 복귀·`respawned`(완주한 차 제외, 컴퓨터도 같음), touching → `contactSlow` `CONTACT_SLOW_TICKS` 감속. 테스트: `tests/unit/race.test.ts`에 4건 추가 — SC-014 끼임 10회 자동 복귀·재시작 0, SC-013 결승선 후진 왕복 20·역주행 1바퀴·가로지르기·복귀 10회에서 바퀴 증가 0·순위 상승 0, SC-012 30분 이상(108,000틱 이상) 느린 주행 강제 종료 0·시간 = 틱 ÷ 60, 복귀 자세(data-model.md 7장 후보 4곳): 진행도 ≤ 복귀 전·다른 차와 겹치지 않음, 옆 3칸이 다른 3대로 막혀도 네 번째 후보로 복귀, 곡선 체크포인트에서 다른 차 한 대가 두 후보를 함께 막지 못함(FR-061, 사용자 결정 2026-10-12). 검증: `npm test -- tests/unit/race.test.ts`
+- [ ] T073 [US4] `src/race/race.ts` `finishResult`. 테스트: `tests/unit/race.test.ts`에 5건 추가 — 엄격히 짧을 때만 새 기록(같으면 아님), runBest·storedBest 중 짧은 쪽 기준, `MAX_RECORD_CS` 초과는 후보 제외, 완주 5회의 최솟값 = 최고 기록(SC-015, FR-064), storage.md 7장 두 탭 첫 사례의 결과 부분(다른 탭 저장값 30000, 이 탭 runBest 없음·31000 완주 → `finishResult`의 `isNewBest` false·`best` 30000, SC-019). 그 결과로 `commitSave`를 부르지 않는 것은 T077의 flow 동작(events.md 5장 `playerFinished`). 검증: `npm test -- tests/unit/race.test.ts`
 - [ ] T074 [P] [US4] `src/render/trackView.ts` `renderTrack`: 노면·벽·결승선(마을과 다른 색·모양, FR-052), 4대 차량 모델, 아이 차 구별 표시(FR-053), 아이 차 탑승객, 카메라 추적. 검증: `npm run typecheck`
 - [ ] T075 [P] [US4] `src/ui/hud.ts` 레이싱: 순위 n/4, 바퀴 `min(lapsDone + 1, laps)/laps`, 경기 시간 `formatRecord`, 카운트다운 큰 숫자·출발 그림(FR-055, FR-056). 검증: `npm run typecheck`
 - [ ] T076 [P] [US4] `src/ui/screens.ts` `raceResult`: 순위·`formatRecord(timeCs)`·최고 기록·새 기록 표시, 순위와 상관없는 칭찬, 재도전·시작 화면으로(FR-063, FR-065). 검증: `npm run typecheck`
-- [ ] T077 [US4] `src/app/flow.ts` 레이싱 연결: race 진입 때 `createRace` + `releaseAll`, 틱마다 `stepRace`, events.md 5장 반응(go 때 `releaseAll` 안 함, rankChanged·lapCompleted → HUD, 플레이어 respawned → `releaseAll`, playerFinished → `loadSave(key).data.best` → `finishResult` → `race.result`·`run.best` → isNewBest면 `commitSave(…, 'best', …)` → false면 storageNotice 1회 → `raceResult`), 재도전은 새 경기, `__e2e.raceTicks`·`__e2e.playerRank`. 선행: T065, T071~T076. 검증: `npm run build`, 동작은 T078
+- [ ] T077 [US4] `src/app/flow.ts` 레이싱 연결: race 진입 때 `createRace` + `releaseAll`, 틱마다 `stepRace`, events.md 5장 반응(go 때 `releaseAll` 안 함, rankChanged·lapCompleted → HUD, 플레이어 respawned → `releaseAll`, playerFinished → `loadSave(key)`(`ok`가 거짓이면 storageNotice 1회, FR-080) → 그 `data.best`로 `finishResult` → `race.result`·`run.best` → isNewBest면 `commitSave(…, 'best', …)` → false면 storageNotice 1회 → `raceResult`), 재도전은 새 경기, `__e2e.raceTicks`·`__e2e.playerRank`. 선행: T065, T071~T076. 검증: `npm run build`, 동작은 T078
 - [ ] T078 [US4] `tests/e2e/race.spec.ts` 신설 — `tutorialDone: true` 저장값 주입 → 차량 5종 각각 레이싱 진입(SC-001 레이싱), 카운트다운 동안 raceTicks 0 → go 뒤 증가(`page.clock`), playerRank가 1~4. 3D 필요 → T005 규칙. 검증: `npm run test:e2e -- tests/e2e/race.spec.ts`
 
 **Checkpoint**: 열린 레이싱을 처음부터 결과·재도전까지 플레이 가능.
@@ -230,7 +231,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - [ ] T090 [US7] `src/app/flow.ts`·`src/main.ts` 오류 흐름: 로딩 진행률 표시, loadFailed 다시 시도(진행 중 버튼 비활성, `reloadNeeded`면 `location.reload()`, 아니면 `retryFailed`, `prepareModel` reject는 그 파일 실패로 처리), main의 unsupported → 안내 화면, 플레이 밖에서 세로면 rotate 안내(`start` 포함), 컨텍스트가 일정 실제 시간 안에 복구되지 않으면 `fatal`. 파일: `src/app/flow.ts`, `src/main.ts`. 선행: T086, T089. 검증: `npm run build`, 동작은 T091
 - [ ] T091 [US7] `tests/e2e/failures.spec.ts` 신설 — `**/*.glb` abort → `loadFailed`·다시 시도 버튼, 60초 동안 자동 재요청 0(`page.clock`), 경로 복구 뒤 다시 시도 → 문서 요청 없이 `start`(quickstart S7-1); `**/buggy-*.glb` 404 → 다시 시도가 페이지를 새로 엶(`load` 이벤트, A5); `getContext('webgl2')` null → `unsupported`·빈 화면 아님(S6); 세로 viewport로 열면 로딩 뒤 rotate 안내, 가로로 바꾸면 `start`(US7-1); 메인 JS 404 → 부팅 가드 다시 시도 버튼(FR-001) — 5건. 선행: T088, T090. 검증: `npm run test:e2e -- tests/e2e/failures.spec.ts`
 - [ ] T092 [US7] `tests/e2e/boot.spec.ts`에 1건 추가 — 권한 API(`getUserMedia`, `geolocation.*`, `Notification.requestPermission`, `DeviceMotionEvent.requestPermission`) 호출 0(FR-084, SC-025). 검증: `npm run test:e2e -- tests/e2e/boot.spec.ts`
-- [ ] T093 [US7] 공개 주소 확인(quickstart S1-3, T029 배포 뒤): 하위 경로 로딩, 로딩·시작·연습 중 새로 고침, 404·외부 요청 0. 기록: `records/device-check.md` 신설. 검증: 항목별 예/아니오와 날짜(SC-022)
+- [ ] T093 [US7] **[승인 필요: 커밋·푸시]** 첫 공개 배포와 공개 주소 확인(quickstart 2.4·S1-3): 사용자 승인 뒤 `main` 푸시 → Actions 성공 → `curl -sI https://kimwoo-ya.github.io/driving_game/` 200, 공개 주소에서 하위 경로 로딩·`start` 도달, 로딩·시작·연습 중 새로 고침, 404·외부 요청 0, 시작 화면에서 크레딧 열림. 선행: T007, T029, T096(크레딧은 공개 배포의 필수 조건, spec US8). 기록: `records/device-check.md` 신설. 검증: Actions 성공·curl 200과 항목별 예/아니오·날짜(SC-022)
 
 **Checkpoint**: 실패 환경에서도 빈 화면이 없음.
 
@@ -242,7 +243,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 
 **Independent Test**: 시작 화면 → 크레딧에서 차량 5·사람 3 각각의 표시를 PRD 표와 대조(spec US8). 자동: T094, T096.
 
-- [ ] T094 [P] [US8] `src/content/credits.ts`(`Credit`, `CreditId`, `CREDITS` 모델 8행: data-model.md 2.1 표, licenseUrl, `changes`는 assets.md 7장 문구(차량 5종 / Cool Bannana Guy·Turtle 리깅 문구 / Chicken Guy), `checkedOn: '2026-10-12'`; `src/assets/models/CREDITS.md`와 내용 일치) 생성 + `tests/unit/content.test.ts`에 #19 1건 추가(FR-088, SC-026 8/8). 파일: `src/content/credits.ts`, `tests/unit/content.test.ts`. 검증: `npm test -- tests/unit/content.test.ts`
+- [ ] T094 [P] [US8] `src/content/credits.ts`(`Credit`, `CreditId`, `CREDITS` 모델 8행: data-model.md 2.1 표, licenseUrl, `changes`는 assets.md 7장 문구(차량 5종 / Cool Bannana Guy·Turtle 리깅 문구 / Chicken Guy), `checkedOn: '2026-10-12'`; 캐릭터 3종의 작품명·제작자·원출처·라이선스는 `src/assets/models/CREDITS.md`와 같음 — 변경 문구는 assets.md 7장 기준이며 CREDITS.md 제작 기록과 문장까지 같을 필요 없음) 생성 + `tests/unit/content.test.ts`에 #19 1건 추가(FR-088, SC-026 8/8). 파일: `src/content/credits.ts`, `tests/unit/content.test.ts`. 검증: `npm test -- tests/unit/content.test.ts`
 - [ ] T095 [US8] `src/ui/screens.ts` 크레딧 화면(행마다 작품명·제작자·원출처·라이선스·변경 사실, 주소는 `textContent` 글자, 돌아가기)과 `src/app/flow.ts` `start` ⇄ `credits`(FR-087~090). 파일: `src/ui/screens.ts`, `src/app/flow.ts`. 검증: `npm run build`
 - [ ] T096 [US8] `tests/e2e/credits.spec.ts` 신설 — 크레딧에 8행의 작품명·라이선스·변경 사실 표시(US8-1·2), `start`·`credits`·`pickVehicle`·`pickCharacter`·`practiceMenu`(저장값 주입)에서 `a[href]` 0(FR-086, SC-026) — 2건. 검증: `npm run test:e2e -- tests/e2e/credits.spec.ts`
 
@@ -276,7 +277,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 **Purpose**: 측정 도구, 금지 패턴 검사, 기기 점검과 조정, 실제 기기·어린이 관찰, 문서 맞춤, 최종 확인.
 
 - [ ] T111 [P] `src/render/stage.ts` `?perf` 표시(첫 화면까지 시간(`performance.timeOrigin` 기준), 평균 fps, 가장 긴 프레임, 그리기 호출, 삼각형; static-paths.md 6장, SC-024). 검증: `npm run build`, 브라우저에서 `?perf`를 붙이면 수치가 보이고 없으면 보이지 않음
-- [ ] T112 금지 패턴 0건 검사(코드 파일만, 문서·테스트 제외; contracts/overview.md 공통 규칙 1·3·5, FR-081·084~086, SC-025). 검증: 아래 4개 명령 모두 출력 없음 — `grep -rnE "innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function|href" src/ index.html`, `grep -rnE "Date\.now|setTimeout|setInterval|Math\.random" src/sim src/practice src/pedestrianView src/race src/storage src/content`, `grep -rnE "from 'three|document\.|window\.|AudioContext" src/sim src/practice src/pedestrianView src/race src/storage src/content`, `grep -rnE "getUserMedia|geolocation|requestPermission|DeviceMotionEvent" src/`. 걸리면 그 코드를 고친 뒤 다시 확인
+- [ ] T112 금지 패턴 0건 검사(코드 파일만 — `src/`의 `*.ts`와 `index.html`, 문서·테스트·에셋 제외; contracts/overview.md 공통 규칙 1·3·5, FR-081·084~086, SC-025). 외부 링크 여부는 화면 DOM의 `a[href]` 0건 검사(T096)가 맡고, 여기서는 링크를 만드는 코드만 찾습니다(SVG 안의 `<use href="#…">` 같은 그림 내부 참조는 대상 아님). 검증: 아래 5개 명령 모두 출력 없음(grep은 일치가 없으면 종료 1이며 이것이 통과 — 공통 "종료 0" 규칙의 예외) — `grep -rnE --include='*.ts' "innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function|createElement\(['\"]a['\"]\)|\.href\b|setAttribute\(['\"]href" src/`, `grep -nE "<a[ >]|innerHTML|eval\(" index.html`, `grep -rnE --include='*.ts' "Date\.now|setTimeout|setInterval|Math\.random" src/sim src/practice src/pedestrianView src/race src/storage src/content`, `grep -rnE --include='*.ts' "from 'three|document\.|window\.|AudioContext" src/sim src/practice src/pedestrianView src/race src/storage src/content`, `grep -rnE --include='*.ts' "getUserMedia|geolocation|requestPermission|DeviceMotionEvent" src/`. 걸리면 그 코드를 고친 뒤 다시 확인
 - [ ] T113 초기 기기 점검(plan O6·O7): 대표 기기·최소 OS/브라우저 버전 선정, SC-023·SC-024 목표 수치, "너무 작은 화면" 기준을 정해 `src/platform/lifecycle.ts` 기준 상수와 `src/render/stage.ts` 픽셀 비율 상수를 조정. 기록: `records/device-check.md`(`?perf` 측정: 로딩 시간, 마을 연습 60초·레이싱 60초 평균 fps·가장 긴 프레임·그리기 호출). 선행: T111. 검증: 기록, `npm run build`
 - [ ] T114 **[승인 필요]** Vite 8.3.3 이상으로 올리기(plan O9; 2026-10-20 이후, 2주 기준 확인) — 실제 기기에서 `npm run dev -- --host`를 쓰기 전에. 파일: `package.json`, `package-lock.json`. 검증: `npm ci && npm test && npm run build && npm run test:e2e` 종료 0
 - [ ] T115 트랙·주행 조정(plan O5, SC-011): `src/sim/vehicle.ts` `DRIVING_SPEC` 값, `src/content/track.ts` 중심선·폭·체크포인트·laps 확정(모양이나 바퀴 수가 바뀌면 revision + 1). 기록: `records/play-check.md`. 검증: `npm test`
@@ -284,7 +285,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - [ ] T117 연습 조정 상수(plan O5): `src/practice/scenario.ts`(`IDLE_HINT_TICKS`, `DEMO_AFTER_FAILS`, `EXPLAIN_TICKS`; 꼭 기다려야 하는 시간은 기기 자동 잠금보다 충분히 짧게)와 `src/practice/ruleRotation.ts`(`EXTRAS_PER_VIEW`, 3~5세 안내 길이). 기록: `records/play-check.md`. 검증: `npm test`
 - [ ] T118 레이싱 조정 상수(plan O5): `src/race/race.ts`(`COUNTDOWN_TICKS`, `CONTACT_SLOW_TICKS`)와 `src/race/progress.ts`(`STUCK_TICKS`). 기록: `records/play-check.md`. 검증: `npm test`
 - [ ] T119 정지 인정 범위(`stopZone`)·ActorPlan 값 조정: `src/content/scenarios.ts`(3~5세 기준 넉넉하게). 기록: `records/play-check.md`. 검증: `npm test`(#16·#17 포함)
-- [ ] T120 실제 기기 시험: SC-002(±0.05초·±0.1 m), SC-003(7상황 × 10회), SC-004, SC-005(각 10회), SC-006, SC-007, SC-012(지원 기기 1회), SC-021(무음 상태), SC-023(선정 기기 전체), SC-024, SC-032(15조합 탑승객·Chicken Guy 3/3), plan O7 미확인 항목. 기록: `records/device-check.md`. 검증: SC별 결과·기기·날짜
+- [ ] T120 실제 기기 시험: SC-002(±0.05초·±0.1 m), SC-003(7상황 × 10회), SC-004, SC-005(각 10회), SC-006, SC-007, SC-012(지원 기기 1회), SC-021(무음 상태와 음원 전부 차단 상태 각각 시작~레이싱 완주, 2/2), SC-023(선정 기기 전체), SC-024, SC-032(15조합 탑승객·Chicken Guy 3/3), plan O7 미확인 항목. 기록: `records/device-check.md`. 검증: SC별 결과·기기·날짜
 - [ ] T121 어린이 플레이 관찰(SC-028, SC-029): 관찰 계획(그룹별 인원·통과 비율 기준)과 결과. 기록: `records/child-observation.md` 신설. 검증: 그룹별 비율과 날짜
 - [ ] T122 문서 맞춤: 점검 결과(O2·O3·O5·O6·O8 등)를 `plan.md` Open Issues와 `research.md`에 함께 반영(plan 결정이 바뀌면 research도 같이). 파일: `specs/001-kids-driving-safety-game/plan.md`, `specs/001-kids-driving-safety-game/research.md`. 검증(문구 검사): 해결된 O 항목마다 결과와 날짜가 있음
 - [ ] T123 최종 확인: `npm run typecheck && npm test && npm run build && npm run test:e2e` 종료 0, quickstart S1~S7 수동 확인. 기록: `records/play-check.md`·`records/device-check.md`. 검증: 명령 종료 코드와 시나리오별 결과
@@ -295,7 +296,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: 바로 시작. T001·T005·T006은 승인 뒤에만 실행. T007은 사용자 작업이며 T029 전에 끝나야 함
+- **Setup (Phase 1)**: 바로 시작. T001·T005·T006은 승인 뒤에만 실행. T007은 사용자 작업이며 T093(첫 공개 배포) 전에 끝나야 함
 - **Foundational (Phase 2)**: Setup 완료 뒤. 모든 이야기를 막음
 - **US1 (Phase 3)**: Foundational 뒤
 - **US2 (Phase 4)**: US1 뒤(조작 버튼·흐름·마을 기본 장면·탑승객 렌더러를 씀)
@@ -303,7 +304,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - **US4 (Phase 6)**: US3 뒤(시작 화면 레이싱 버튼·race 진입 경로). 순수 로직 T068~T073은 Foundational 뒤 언제든 가능
 - **US5 (Phase 7)**: US4 뒤(모든 이벤트에 소리를 붙임). T079·T080은 Foundational 뒤 언제든 가능
 - **US6 (Phase 8)**: US5 뒤(일시정지가 소리·보행자 시점 안내 되감기를 다룸)
-- **US7 (Phase 9)**: US6 뒤(flow 오류 흐름이 생명주기 처리 위에 놓임). T088·T089는 Foundational 뒤 언제든 가능
+- **US7 (Phase 9)**: US6 뒤(flow 오류 흐름이 생명주기 처리 위에 놓임). T088·T089는 Foundational 뒤 언제든 가능. T093(첫 공개 배포)은 US8의 T096 뒤(크레딧이 공개 배포의 필수 조건)
 - **US8 (Phase 10)**: Foundational 뒤 언제든 가능하지만 `screens.ts`·`flow.ts`를 함께 고치므로 순서대로 진행 권장
 - **콘텐츠 (Phase 11)**: US2·US4의 데이터 형식이 정해진 뒤(plan 작업 단계 5). T098(사용자 결정)이 T099 이후를 막음
 - **Polish (Phase 12)**: 원하는 이야기가 끝난 뒤. T114는 2026-10-20 이후, 실제 기기에서 개발 서버를 열기 전
@@ -332,7 +333,6 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 
 ```bash
 Task: "T008 src/core/loop.ts + tests/unit/loop.test.ts"
-Task: "T009 src/content/vehicles.ts + src/content/characters.ts"
 Task: "T016 src/storage/save.ts + tests/unit/save.test.ts"
 Task: "T026 src/ui/screens.ts 시작 화면 + src/style.css"
 ```
@@ -379,20 +379,20 @@ US3·US5·US6·US7·US8은 `flow.ts`·`screens.ts`·`overlays.ts`를 공유하�
 ### MVP First (User Story 1)
 
 1. Phase 1 Setup(승인 항목 포함) → Phase 2 Foundational → Phase 3 US1
-2. **멈추고 확인**: T040·T041 통과, T042 렌더링 점검 기록, 배포 주소에서 "골라서 운전해 보기" 시연
+2. **멈추고 확인**: T040·T041 통과, T042 렌더링 점검 기록, 로컬 미리보기(`npm run preview`, 하위 경로)에서 "골라서 운전해 보기" 시연(공개 배포는 크레딧 뒤 T093)
 3. 이어서 US2까지 마치면 P1 범위(교육 핵심) 완성
 
 ### Incremental Delivery
 
-1. Setup + Foundational → 하위 경로 배포 확인
-2. US1 → US2(P1 완성) → US3 → US4 → US5 → US6(P2 완성) → US7 → US8(P3, 공개 배포 필수 조건 포함)
+1. Setup + Foundational → 하위 경로 로컬 확인(배포 워크플로 파일만 준비)
+2. US1 → US2(P1 완성) → US3 → US4 → US5 → US6(P2 완성) → US7 → US8(P3, 공개 배포 필수 조건 포함) → T093 첫 공개 배포
 3. 콘텐츠 단계(사용자 결정 뒤) → 점검 단계
 4. 각 이야기는 끝의 Checkpoint에서 독립 확인 기준으로 검사
 
 ### 진행 전 필요한 사용자 작업
 
-- analyze·implement 단계의 교차 검증(`review-snapshot.py`)에는 Git HEAD가 필요합니다. tasks 확정 뒤 사용자 요청으로 첫 커밋을 만듭니다(임의 커밋 금지).
-- [승인 필요] 태스크(T001, T005, T006, T029, T114)는 각각 승인을 받은 뒤 실행합니다.
+- analyze·implement 단계의 교차 검증(`review-snapshot.py`)에는 Git HEAD가 필요합니다. 첫 커밋은 2026-10-12 사용자 승인으로 만들었습니다(`2739ec0`). 이후 커밋도 사용자 요청 때만 합니다(임의 커밋 금지).
+- [승인 필요] 태스크(T001, T005, T006, T093, T114)는 각각 승인을 받은 뒤 실행합니다.
 
 ---
 
@@ -411,7 +411,7 @@ US3·US5·US6·US7·US8은 `flow.ts`·`screens.ts`·`overlays.ts`를 공유하�
 |---|---|---|---|
 | SC-001 | T040, T078, T120 | SC-017 | T016, T066, T067 |
 | SC-002 | T011, T120 | SC-018 | T016 |
-| SC-003 | T041, T087, T120 | SC-019 | T016 |
+| SC-003 | T041, T087, T120 | SC-019 | T016, T073 |
 | SC-004 | T011, T030, T120 | SC-020 | T080, T083 |
 | SC-005 | T041, T120 | SC-021 | T045, T083, T120 |
 | SC-006 | T087, T091, T120 | SC-022 | T028, T091, T093 |

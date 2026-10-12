@@ -83,7 +83,7 @@ type RaceEvent =
 | `rankChanged` | `go` 틱에 1번, 그 뒤 플레이어 순위가 바뀐 틱(FR-056) | HUD 순위 | — | — |
 | `lapCompleted` | 어느 차든 결승선을 정방향으로 넘어 바퀴가 인정된 틱(마지막 바퀴 제외, FR-059) | 플레이어 slot이면 HUD 바퀴 표시 | 플레이어면 `playSfx('lap')` | — |
 | `respawned` | 끼임·이탈로 `STUCK_TICKS`를 채워 복귀한 틱(FR-061) | (렌더러가 state로 위치 표시) | — | 플레이어 slot이면 `releaseAll()`(FR-017 코스 복귀) |
-| `playerFinished` | 플레이어가 마지막 바퀴 결승선을 정방향으로 넘은 틱(→ `finished`, 그 틱의 순위로 확정, FR-063) | 결과 화면 `raceResult`(순위·`formatRecord(timeCs)`·최고 기록·새 기록 표시). 마지막 순위여도 칭찬만(FR-063) | `playSfx('success')`, `playVoice('race-finish')`, 새 기록이면 이어서 `playVoice('new-best')` | `stored = loadSave(key).data.best` → `result = finishResult({ timeCs, rank, runBest: run.best, storedBest: stored, trackConfigKey: key })` → `race.result = result`, `run.best = result.best` → `result.isNewBest`이면 `commitSave(…, 'best', …)`(FR-064, FR-083). 저장 실패면 안내 1회, 결과 화면은 늦추지 않음(FR-080) |
+| `playerFinished` | 플레이어가 마지막 바퀴 결승선을 정방향으로 넘은 틱(→ `finished`, 그 틱의 순위로 확정, FR-063) | 결과 화면 `raceResult`(순위·`formatRecord(timeCs)`·최고 기록·새 기록 표시). 마지막 순위여도 칭찬만(FR-063) | `playSfx('success')`, `playVoice('race-finish')`, 새 기록이면 이어서 `playVoice('new-best')` | `saved = loadSave(key)` → `saved.ok`가 거짓이면 아직 안 보였을 때 안내 1회(FR-080) → `result = finishResult({ timeCs, rank, runBest: run.best, storedBest: saved.data.best, trackConfigKey: key })` → `race.result = result`, `run.best = result.best` → `result.isNewBest`이면 `commitSave(…, 'best', …)`(FR-064, FR-083). 저장 실패면 안내 1회(읽기 실패 안내와 합쳐 실행당 1회), 결과 화면은 늦추지 않음(FR-080) |
 
 ## 6. 이벤트가 아닌 신호와 flow 반응
 

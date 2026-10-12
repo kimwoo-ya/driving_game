@@ -88,7 +88,7 @@ Blender 5.2.2 LTS와 공식 MCP는 이번 작업 기기에 설치되어 있습�
 ### 2.4 배포 켜기 **[사용자 작업]**
 
 1. 저장소 Settings → Pages → Build and deployment → Source를 "GitHub Actions"로 바꿉니다.
-2. 첫 커밋을 `main`에 푸시합니다(현재 저장소에 커밋 없음).
+2. 크레딧 화면(tasks T094~T096)이 갖춰진 뒤 사용자 승인을 받아 `main`을 푸시합니다(tasks T093). 크레딧은 공개 배포의 필수 조건이라 그 전에는 푸시하지 않습니다. 첫 커밋은 2026-10-12에 만들었습니다.
 3. Actions의 배포 워크플로가 성공하면 `https://kimwoo-ya.github.io/driving_game/`이 열립니다.
 
 ## 3. 실행·빌드·테스트 명령

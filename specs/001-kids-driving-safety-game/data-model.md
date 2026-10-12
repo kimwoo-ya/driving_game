@@ -37,7 +37,7 @@ type Rect = { minX: number; minZ: number; maxX: number; maxZ: number }; // 축 �
 | 2 | 인물 종류 | `CharacterKind`, `CharacterKindId`, `CHARACTERS` | 정적 | 앱 | `src/content/characters.ts` | 3종 외형. 보행자·주인공은 `'chicken-guy'` 고정(FR-096) |
 | 3 | 탑승객 (용어집) | `SeatDef` + `RunState.selectedCharacter` | 정적+상태 | 앱 / 실행 | vehicles.ts, `src/app/session.ts` | 아이 차에 탄 고른 인물. 판정 무관(FR-097, FR-011) |
 | 4 | 공통 운전 성능 | `DrivingSpec`, `DRIVING_SPEC` | 정적 | 앱 | `src/sim/vehicle.ts` | 모든 차가 쓰는 성능 1묶음(FR-011, FR-054) |
-| 5 | 운전 입력 | `DriveInput` | 상태 | 틱 | `src/input/controls.ts` | 조향·액셀·브레이크(우선순위 처리 후) + 후진 전환 사건(FR-014~017) |
+| 5 | 운전 입력 | `DriveInput` | 상태 | 틱 | `src/sim/vehicle.ts`(만드는 곳 `src/input/controls.ts`) | 조향·액셀·브레이크(우선순위 처리 후) + 후진 전환 사건(FR-014~017) |
 | 6 | 주행 상태 | `DriveState`, `Gear` | 상태 | 시도·경기 | `src/sim/vehicle.ts` | 위치·방향·속도·전진/후진(FR-018, FR-019) |
 | 7 | 교육용 마을 | `TownDef`, `TOWN` | 정적 | 앱 | `src/content/town.ts` | 구역·신호·장면 요소 배치(FR-028) |
 | 8 | 장면 요소 | `SceneElementId`, `ScenePropPlacement` | 정적 | 앱 | town.ts | 마을 소품 12종 + 날씨 2종(FR-092) |
@@ -522,7 +522,7 @@ erDiagram
 | 상태 | 사건 | 가드 | 다음 / 동작 | 근거 |
 |---|---|---|---|---|
 | (실행 시작) | `loadSave` | 검사를 통과한 `tutorialDone === true` | 열림 | spec 주요 상태 흐름 |
-| (실행 시작) | `loadSave` | 그 밖(기록 없음·읽기 실패·저장 불가·잘못된 값·모르는 형식) | 잠김 | 같음 |
+| (실행 시작) | `loadSave` | 그 밖(기록 없음·읽기 실패·잘못된 값·모르는 형식). 읽기는 됐고 시험 쓰기만 실패하면 읽은 값을 따름(4.11) | 잠김 | 같음 |
 | 잠김 | `scenarioCompleted` | `completedThisRun.size === 3` | 열림 → **같은 틱에** `commitSave('tutorial')`(실패해도 열림 유지, 안내만) | FR-047, FR-080 |
 | 열림 | 어떤 사건이든 | — | 열림 유지(잠김으로 가는 전이 없음) | FR-050 |
 
@@ -639,7 +639,8 @@ erDiagram
 | 현재 | 사건 | 가드 | 다음 / 동작 | 근거 |
 |---|---|---|---|---|
 | (실행 시작) | `loadSave`(읽기 + 시험 쓰기·지우기) | 예외 없음 | 저장 값 적용 | FR-079 |
-| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | — | 기본값으로 시작, `storageNotice = true`, `storageNoticeShown = true` | FR-080, US3-8 |
+| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | 접근·읽기 실패 | 기본값으로 시작, `storageNotice = true`, `storageNoticeShown = true` | FR-080, US3-8 |
+| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | 읽기는 됐고 시험 쓰기·지우기만 실패 | 읽은 값(`data`) 적용, `storageNotice = true`, `storageNoticeShown = true`(contracts/storage.md 5장) | FR-079, FR-080, 사용자 결정 2026-10-12 |
 | 아무 때 | `commitSave`가 `false`(저장소 API 예외) | — | 메모리 값으로 계속, flow가 아직 안 보였으면 안내 1회. 다음 저장 때 또 시도 | FR-080, spec.md:256 |
 | 아무 때 | 값 손상·변조·모르는 형식 | 저장소 API는 정상 | 해당 항목만 기본값, **안내 없음** | FR-081, 02 결정 B9 |
 
@@ -795,7 +796,7 @@ function commitSave(current: Omit<SaveDataV1, 'v'>, changed: 'tutorial' | 'best'
 
 - 완주 때는 저장 전에 최신 값을 읽어 `기존 = shorter(run.best, 최신.best)`와 비교합니다. 다른 탭이 더 좋은 기록을 남겼다면 이 탭의 결과 화면도 그 기록을 최고 기록으로 보여 주고 "새 기록"을 띄우지 않습니다(7장).
 - 다른 탭이 남긴 `tutorialDone = true`를 이 탭의 레이싱 열림에 바로 반영하지 않습니다. 열림 조건은 "실행 시작 시 저장 값"과 "이번 실행 완료"뿐이며(spec 주요 상태 흐름), 다음 새로 고침 때 반영됩니다. `storage` 이벤트는 듣지 않습니다.
-- 한계: 읽기와 쓰기 사이의 아주 짧은 순간에 다른 탭이 쓰면 그 값이 덮일 수 있습니다(브라우저가 탭 사이 잠금을 보장하지 않음). 두 탭이 거의 같은 순간에 저장해야 생기므로 받아들입니다. 문제가 되면 쓰기 직후 다시 읽어 비교하는 단계를 더합니다.
+- 한계: 읽기와 쓰기 사이의 아주 짧은 순간에 다른 탭이 쓰면 그 값이 덮일 수 있습니다(브라우저가 탭 사이 잠금을 보장하지 않음). 두 탭이 거의 같은 순간에 저장해야 생기므로 받아들입니다. spec FR-083·SC-019도 이 틈을 보장 범위에서 제외합니다(사용자 결정 2026-10-12). 문제가 되면 쓰기 직후 다시 읽어 비교하는 단계를 더합니다.
 
 ### 5.6 읽기·쓰기 시점
 
@@ -947,7 +948,7 @@ function commitSave(current: Omit<SaveDataV1, 'v'>, changed: 'tutorial' | 'best'
 | 멈춤 | `drive.speed === 0` | 02 결정 B4 |
 | 코스 진행도 `progressValue(car)` | `last = (nextCheckpoint − 1 + n) % n`, `seg` = 체크포인트 `last`에서 다음 체크포인트까지 중심선 길이, `along` = 그 구간 범위 안에서만 차 위치를 중심선에 투영한 거리. **`progress = lapsDone × L + cp[last].arc + clamp(along, 0, seg)`**(L = 한 바퀴 길이) | FR-057, FR-059 |
 | 순위 `rankCars(cars)` | ① 완주한 차가 앞 ② 완주끼리 `finish.tick` 작은 순 → `finish.overshoot` 큰 순 ③ 미완주끼리 `progress` 큰 순 ④ 그래도 같으면 플레이어 앞 → `slot` 작은 순. 순위 = 정렬 위치 + 1 | FR-057, spec.md:610 |
-| 복귀 자세 | 마지막 통과 체크포인트(`last`) 위치, 중심선 접선 방향, 옆 칸 3개(중심, 좌·우 `width/3`) 중 다른 차와 겹치지 않는 첫 칸. 복귀 뒤 `progress = lapsDone × L + cp[last].arc` ≤ 복귀 전 | FR-061 |
+| 복귀 자세 | 마지막 통과 체크포인트(`last`)를 기준으로 후보 4곳: 그 지점의 중심·좌·우(`width/3`) 3칸과, 그 지점에서 중심선 접선의 반대 방향으로 **직선** `5 × bodyRadius` 물러난 1칸(곡선에서도 직선거리 기준). 이 순서로 다른 차와 겹치지 않는 첫 후보, 방향은 중심선 접선. 후보끼리 직선거리가 `4 × bodyRadius`보다 크고(`width/3 > 4 × bodyRadius`, 트랙 검사 #18) 차 한 대는 반지름 `2 × bodyRadius` 안의 후보만 막으므로 두 후보를 함께 막을 수 없고, 다른 차는 3대뿐이라 빈 후보가 늘 하나 이상 있음. 뒤 후보도 트랙 안(#18). 복귀 뒤 `progress = lapsDone × L + cp[last].arc` ≤ 복귀 전 | FR-061, 사용자 결정 2026-10-12 |
 | 완주 시간 | `timeCs = Math.round(raceTicks × 100 / TICK_HZ)`, 플레이어 완주 틱에서 1회 | FR-055, FR-064 |
 | `FinishResult` | 순수 함수 `finishResult({ timeCs, rank, runBest, storedBest, trackConfigKey })`(`src/race/race.ts`). 플레이어 완주 틱에 flow가 `storedBest = loadSave(key).data.best`를 읽어 부르고 결과를 `RaceState.result`에 넣음. 계산: `기존 = shorter(run.best, 최신 저장값.best)`, `isNewBest = timeCs ≤ MAX_RECORD_CS ∧ (기존 === null ∨ timeCs < 기존.timeCs)`, `run.best = isNewBest ? { trackConfigKey, timeCs } : 기존`, 결과 `{ timeCs, rank, isNewBest, best: run.best }` | FR-063, FR-064 |
 | 기록 표시 `formatRecord(timeCs)` | 1시간 미만 `m:ss.cc`(예 `4:55.20`), 이상 `h:mm:ss.cc`. 입력은 정수 `timeCs`만 | FR-062, FR-064, 02 결정 B3 |
