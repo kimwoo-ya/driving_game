@@ -66,7 +66,7 @@ export function commitSave(
 
 | 시점 | 호출 | 근거 |
 |---|---|---|
-| 부팅(`boot` → `loading`) | `loadSave(trackConfigKey(TRACK))` → `createRunState(data)`. `ok === false`면 `storageNotice` 1회 | FR-079, FR-080, US3-8 |
+| 부팅(`boot` → `loading`) | `loadSave(trackConfigKey(TRACK))` → `createRunState(data)`. `ok === false`면 시작 화면이 처음 나올 때 `storageNotice` 1회 | FR-079, FR-080, US3-8 |
 | 세 번째 상황 완료 순간 | `commitSave(run, 'tutorial', key)` | FR-047 |
 | 플레이어 완주 순간 | `loadSave(key).data.best`로 최신 기록을 읽어 `finishResult` 계산 → `isNewBest`일 때만 `commitSave(run, 'best', key)` | FR-063, FR-064 |
 | 소리 설정 변경 순간 | `commitSave(run, 'sound', key)` | FR-069 |

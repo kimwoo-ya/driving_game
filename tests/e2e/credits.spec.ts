@@ -24,8 +24,11 @@ test('크레딧: 시작 화면에서 열어 8행의 작품명·라이선스·변
   await screen(page).toHaveAttribute('data-screen', 'start');
 });
 
-// practiceMenu(T063)는 첫 배포 뒤라 화면이 생기면 여기에 더함
-test('누르면 게임 밖으로 나가는 링크 0: start·credits·pickVehicle·pickCharacter (FR-086, SC-026)', async ({ page }) => {
+test('누르면 게임 밖으로 나가는 링크 0: start·credits·pickVehicle·pickCharacter·practiceMenu (FR-086, SC-026)', async ({ page }) => {
+  // 완료 기록을 넣어 두면 인물 고르기 뒤 연습 목록으로 감
+  await page.addInitScript(() =>
+    localStorage.setItem('driving_game:save', JSON.stringify({ v: 1, tutorialDone: true, best: null, sound: { music: true, voiceSfx: true } })),
+  );
   await toStart(page);
   const links = () => expect(page.locator('a[href]')).toHaveCount(0);
   await links();
@@ -39,5 +42,9 @@ test('누르면 게임 밖으로 나가는 링크 0: start·credits·pickVehicle
   await page.getByRole('button', { name: '버기', exact: true }).click();
   await page.getByRole('button', { name: '다음' }).click();
   await screen(page).toHaveAttribute('data-screen', 'pickCharacter');
+  await links();
+  await page.getByRole('button', { name: 'Chicken Guy', exact: true }).click();
+  await page.getByRole('button', { name: '다음' }).click();
+  await screen(page).toHaveAttribute('data-screen', 'practiceMenu');
   await links();
 });

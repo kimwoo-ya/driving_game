@@ -104,3 +104,70 @@ for (const [width, height] of [
     await page.screenshot({ path: testInfo.outputPath(`controls-${width}x${height}.png`) });
   });
 }
+
+test('키보드: 방향키·WASD = 누르고 있는 버튼, blur 뒤엔 다시 눌러야 반영 (사용자 결정 2026-10-13)', async ({ page }) => {
+  await toLesson(page);
+  for (const [key, button] of [
+    ['ArrowLeft', 'left'],
+    ['KeyA', 'left'],
+    ['ArrowRight', 'right'],
+    ['KeyD', 'right'],
+    ['ArrowUp', 'accel'],
+    ['KeyW', 'accel'],
+    ['ArrowDown', 'brake'],
+    ['KeyS', 'brake'],
+  ]) {
+    await page.keyboard.down(key);
+    await expect(pressed(page, button), key).toHaveAttribute('data-pressed');
+    await page.keyboard.up(key);
+    await expect(pressed(page, button), key).not.toHaveAttribute('data-pressed');
+  }
+  // 조향 + 액셀 동시(FR-014)
+  await page.keyboard.down('ArrowLeft');
+  await page.keyboard.down('ArrowUp');
+  await expect(pressed(page, 'left')).toHaveAttribute('data-pressed');
+  await expect(pressed(page, 'accel')).toHaveAttribute('data-pressed');
+  await page.keyboard.up('ArrowLeft');
+  // blur → 해제, 누르고 있던 키의 반복 입력으로는 다시 눌리지 않음(FR-017)
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(pressed(page, 'accel')).not.toHaveAttribute('data-pressed');
+  await page.keyboard.down('ArrowUp'); // 이미 눌린 키 → repeat
+  await expect(pressed(page, 'accel')).not.toHaveAttribute('data-pressed');
+  await page.keyboard.up('ArrowUp');
+  await page.keyboard.down('ArrowUp');
+  await expect(pressed(page, 'accel')).toHaveAttribute('data-pressed');
+  await page.keyboard.up('ArrowUp');
+  // Cmd·Ctrl·Alt와 함께 누른 키는 브라우저 단축키로 두고 운전 입력으로 받지 않음(Ctrl+R 새로 고침 등, US4 리뷰 제안 1)
+  for (const mod of ['Meta', 'Control', 'Alt']) {
+    await page.keyboard.down(mod);
+    await page.keyboard.down('KeyA');
+    await expect(pressed(page, 'left'), mod).not.toHaveAttribute('data-pressed');
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up(mod);
+  }
+});
+
+test('키보드: R = 앞뒤 바꾸기(멈춘 상태), 조작 버튼이 없는 화면에서는 무시', async ({ page }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem('driving_game:save', JSON.stringify({ v: 1, tutorialDone: true, best: null, sound: { music: true, voiceSfx: true } })),
+  );
+  await page.goto('./?e2e');
+  await expect(page.locator('body')).toHaveAttribute('data-screen', 'start', { timeout: 30_000 });
+  await page.keyboard.press('KeyR');
+  await page.keyboard.down('ArrowUp');
+  await expect(pressed(page, 'accel')).not.toHaveAttribute('data-pressed');
+  await page.keyboard.up('ArrowUp');
+  await expect(page.locator('body')).toHaveAttribute('data-screen', 'start');
+  await page.getByRole('button', { name: '시작' }).click();
+  await page.getByRole('button', { name: '버기', exact: true }).click();
+  await page.getByRole('button', { name: '다음' }).click();
+  await page.getByRole('button', { name: 'Chicken Guy', exact: true }).click();
+  await page.getByRole('button', { name: '다음' }).click();
+  await page.getByRole('button', { name: '신호 기다리기' }).click();
+  await expect(page.locator('body')).toHaveAttribute('data-screen', 'practice');
+  await expect(page.locator('.hud-gear')).toHaveAttribute('data-gear', 'forward');
+  await page.keyboard.press('KeyR');
+  await expect(page.locator('.hud-gear')).toHaveAttribute('data-gear', 'reverse');
+  await page.keyboard.press('KeyR');
+  await expect(page.locator('.hud-gear')).toHaveAttribute('data-gear', 'forward');
+});

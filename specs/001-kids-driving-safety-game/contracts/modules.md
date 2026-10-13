@@ -56,9 +56,9 @@ export function releaseAll(): void;
 |---|---|
 | `pressedButtons` | 버튼 사각형 안(경계 포함)에 점이 하나라도 있으면 눌림. 버튼 밖 점은 무시. 점이 몇 개든 같은 규칙(손바닥·보호자 손가락, Edge "터치 조작"). |
 | `toDriveInput` | `steer = (left ? 1 : 0) − (right ? 1 : 0)`(+1 = 왼쪽, 좌우 동시 = 0 직진), `brake = brake`, `throttle = accel ∧ ¬brake`(브레이크 우선). FR-015, SC-004. |
-| `mountControls` | `layer` 하나에 `pointerdown/move/up/cancel`을 달고 손가락(`pointerId`)마다 좌표를 기록합니다. 이벤트 대상이 아니라 **좌표**로 판정합니다(터치는 처음 누른 요소에 포인터가 잡히므로, FR-016). 버튼 사각형은 붙일 때와 `resize` 때 다시 잽니다. `reverse`·`pause`는 그 사각형 안 `pointerdown` 순간 1회 `onTap`. |
-| `readDriveInput` | 지금 좌표 표 → `pressedButtons` → `toDriveInput`. 틱마다 flow가 부릅니다. |
-| `releaseAll` | 좌표 표를 비우고, 그 순간 닿아 있던 손가락은 뗄 때(`pointerup`/`pointercancel`)까지 무시합니다 → "새로 눌러야 반영"(FR-017, SC-003). `pointercancel`이 온 손가락은 즉시 제거(FR-016). |
+| `mountControls` | `layer` 하나에 `pointerdown/move/up/cancel`을 달고 손가락(`pointerId`)마다 좌표를 기록합니다. 이벤트 대상이 아니라 **좌표**로 판정합니다(터치는 처음 누른 요소에 포인터가 잡히므로, FR-016). 버튼 사각형은 붙일 때와 `resize` 때 다시 잽니다. `reverse`·`pause`는 그 사각형 안 `pointerdown` 순간 1회 `onTap`. 키보드(FR-098): `window`의 `keydown`/`keyup`을 `e.code`로 받아 `ArrowLeft`·`KeyA` = left, `ArrowRight`·`KeyD` = right, `ArrowUp`·`KeyW` = accel, `ArrowDown`·`KeyS` = brake를 키 집합에 넣고 빼며, `KeyR`은 `keydown` 순간 `onTap('reverse')`. `layer.hidden`이거나 Ctrl·Cmd·Alt와 함께 누른 키(`e.ctrlKey`·`e.metaKey`·`e.altKey`)면 `keydown`을 무시하고(브라우저 단축키로 둠, 예: Ctrl+R 새로 고침), `e.repeat`인 `keydown`은 새로 누름으로 보지 않습니다. |
+| `readDriveInput` | 지금 좌표 표 → `pressedButtons`에 키 집합을 합침 → `toDriveInput`. 틱마다 flow가 부릅니다. |
+| `releaseAll` | 좌표 표와 키 집합을 비우고, 그 순간 닿아 있던 손가락은 뗄 때(`pointerup`/`pointercancel`)까지, 누르고 있던 키는 뗐다가 다시 누를 때까지 무시합니다 → "새로 눌러야 반영"(FR-017, SC-003). `pointercancel`이 온 손가락은 즉시 제거(FR-016). |
 | 부르는 시점 | flow가 부름: 일시정지, 숨김, `blur`, 회전·크기 변화(가로 180° 포함), `pedestrianViewStart`, `segmentReset`, `redirect`, 플레이어 `respawned`, 경기 화면 진입, `violation`. **카운트다운이 끝나는 `go`에서는 부르지 않습니다**(카운트다운 중 새로 누른 액셀이 출발 순간 반영, FR-017 단서). |
 | 오류 | 없음. `mountControls` 두 번 호출은 프로그램 오류. |
 
@@ -108,12 +108,17 @@ export function overlaps(s: DriveState, r: Rect): boolean;
 export function blockByTrackWalls(prev: DriveState, next: DriveState, track: TrackDef): { state: DriveState; hit: boolean };
 /** 차체 원끼리 겹친 만큼 떼어 놓고, 닿은 차를 표시한다. */
 export function separateCars(states: readonly DriveState[]): { states: DriveState[]; touching: readonly boolean[] };
+/** (신규) 트랙 닫힌 중심선 계산(벽·진행도·컴퓨터 차량·트랙 그리기 공용). arc = 중심선 시작점부터 거리(m) */
+export function trackLength(track: TrackDef): number;
+export function pointOnTrack(track: TrackDef, arc: number): { p: Vec2; t: Vec2 };            // 꼭짓점에서는 다음 선분 방향
+export function projectOnTrack(track: TrackDef, p: Vec2, from?: number, to?: number): { arc: number; p: Vec2; t: Vec2; dist: number }; // [from, to]로 제한 가능
 ```
 
 | 항목 | 약속 |
 |---|---|
 | 판정 크기 | 차체 원 반지름은 `DRIVING_SPEC.bodyRadius` 하나뿐. 모델 크기·탑승객은 들어오지 않습니다(FR-011). |
 | 표현 | 튕김·회전·뒤집힘 없음. 막히면 위치를 경계 앞에 두고 속도만 줄입니다(FR-035, FR-060). `separateCars`는 `heading`을 바꾸지 않고, 감속(`contactSlow`)은 race가 `touching`을 보고 적용합니다. |
+| 트랙 벽 | 중심선에서 `width/2 − bodyRadius`를 넘는 자리는 그 거리로 당겨 벽 앞에 두고, 속도는 벽을 따라가는 성분만 남깁니다(`speed` × 진행 방향과 벽 방향 내적의 절댓값, 정면이면 멈춤). 겹친 차는 둘이 반씩 떨어집니다(같은 자리면 +X 쪽). |
 | 결정성 | 입력 배열 순서대로 처리하며 같은 입력이면 같은 결과. |
 | 이름 | 세 함수 이름은 (신규). |
 
@@ -255,7 +260,8 @@ export function formatRecord(timeCs: number): string;                    // m:ss
 | 항목 | 약속 |
 |---|---|
 | `createRace` | 4대 모두 `restingAt(TRACK.grid[slot])`, 플레이어는 `TRACK.playerSlot`, 컴퓨터 차량 외형은 `VEHICLES` 순서에서 플레이어 차를 뺀 앞 3종, `phase = 'countdown'`, `countdownTicks = COUNTDOWN_TICKS`, `raceTicks = 0`, `result = null`. 재도전은 새로 만듭니다 → 이전 위치·바퀴·순위·시간·후진 상태가 남지 않음(FR-065). |
-| `countdown` | 어떤 차도 움직이지 않고 `gearTap`은 무시(FR-019 "경기 시작 때 전진·정지"). 부정 출발 벌칙 없음. `countdownTicks`가 0이 되는 틱에 `phase = 'running'`(FR-055). |
+| `countdown` | 어떤 차도 움직이지 않고 `gearTap`은 무시(FR-019 "경기 시작 때 전진·정지"). 부정 출발 벌칙 없음. `countdownTicks`가 0이 되는 틱에 `phase = 'running'`(FR-055). 자리값 `COUNTDOWN_TICKS = 3 × TICK_HZ`(T118). |
+| 접촉 감속 | `touching`인 미완주 차는 `contactSlow`, `slowTicks = CONTACT_SLOW_TICKS`(자리값 30, T118). 그동안 그 차의 액셀 입력이 듣지 않아 자연 감속(`coastDeceleration`)으로 줄어듦 — 성능 한도·`stepVehicle`은 그대로, 모든 차 같은 규칙(FR-054, FR-060). 완주한 차는 계속 달리며 떼어 놓기만 함 |
 | `running` | 틱마다 `raceTicks + 1`(출발 신호부터 셈). 네 대 모두 같은 `stepVehicle`(플레이어 입력은 `input`, 컴퓨터 차량은 `aiInput`). 시간 경과로 끝나지 않습니다(FR-062, SC-012). |
 | 바퀴·순위 | data-model.md 4.8의 "다음 차례 체크포인트만 정방향 인정" 규칙(FR-059, SC-013), 7장 순위·동점 규칙(FR-057). |
 | 끼임·이탈 | `stuckTicks ≥ STUCK_TICKS`이면 복귀 자세로(진행도 오르지 않음, 겹치지 않는 칸), 컴퓨터 차량도 같은 규칙(FR-061, SC-014). |
@@ -274,7 +280,8 @@ export function rankCars(cars: readonly RaceCar[]): readonly (0 | 1 | 2 | 3)[]; 
 ```
 
 - 진행도는 마지막 정상 통과 체크포인트의 다음 구간 끝을 넘지 못합니다 → 가로지르기·복귀로 늘지 않음(FR-059, FR-061).
-- 체크포인트 통과·복귀 자세 계산은 이 파일의 내부 함수입니다(시험은 `stepRace`로).
+- 체크포인트 통과(`crossedNext`)·복귀 자세(`respawnPose`) 계산은 race.ts만 쓰는 내부 함수입니다(내보내지만 계약 밖, 시험은 `stepRace`로). 통과선은 체크포인트 지점에서 중심선에 수직인 트랙 폭 선분, 정방향 = 그 지점 진행 방향 성분이 음수 → 0 이상.
+- `STUCK_TICKS` 자리값 300(5초, T118). `Slot = 0 | 1 | 2 | 3`도 여기서 내보냅니다.
 
 ### 6.3 `src/race/ai.ts`
 
@@ -285,7 +292,9 @@ export function aiInput(car: RaceCar, cars: readonly RaceCar[], raceTicks: numbe
 
 - 돌려주는 것은 `DriveInput`뿐입니다. 성능 한도를 바꿀 길이 없고, 난이도는 `car.ai`(`AiProfile`)의 주행선(`laneOffset`)·목표 속도 비율(`targetSpeedRatio`)·반응 지연(`reactionTicks`)으로만 정합니다. 목표 속도 비율은 "액셀을 언제 떼는지"라는 주행 방식이며 `DRIVING_SPEC` 한도는 같으므로 FR-054에 맞습니다(리더 결정 B17).
 - 모든 차가 틱 시작 시점의 같은 `cars` 스냅숏을 보고 입력을 만듭니다(처리 순서와 무관). 무작위 없음.
-- 앞이 막히면 옆 주행선으로 비키고, 그래도 막히면 복귀 규칙을 따릅니다(FR-060, FR-061).
+- 앞이 막히면 옆 주행선으로 비키고, 그래도 막히면 복귀 규칙을 따릅니다(FR-060, FR-061). 막힘 = 앞 8 m 안의 차가 내 주행선에서 `2 × bodyRadius` 안. 그때는 `[−width/3, 0, width/3]` 중 막은 차들에서 가장 먼 주행선.
+- 주행: 중심선 위 8 m 앞 점(주행선만큼 옆)을 향해 핸들, `speed < targetSpeedRatio × maxForwardSpeed`일 때만 액셀, 브레이크는 쓰지 않음.
+- `reactionTicks`: `aiInput`이 상태를 갖지 않으므로(위 시그니처) "출발 신호에 반응하는 지연"으로 씁니다 — `raceTicks < reactionTicks`이면 액셀을 누르지 않음(구현 판단, US4 검토 때 확인).
 
 ## 7. `src/storage/save.ts` — 저장
 
@@ -379,7 +388,10 @@ export function cloneModel(model: PreparedModel): THREE.Object3D;               
 export function renderShowroom(stage: Stage, list: 'vehicles' | 'characters', selected: number | null): void;
 export function renderTown(stage: Stage, play: PlaySession, scene: ScenarioAttempt | DrivingLessonState): void;
 export function renderTrack(stage: Stage, play: PlaySession, race: RaceState): void;
+export function racePassenger(): CharacterKindId | null;                                       // (신규) E2E 관찰용, 레이싱 화면 탑승객
 ```
+
+- `renderTrack`: 모래 바닥·짙은 남색 노면·빨강/흰 줄무늬 벽·체크무늬 결승선과 문(마을과 구별, FR-052), 아이 차 = 고른 차 + 탑승객 + 바닥 노란 고리(뒤따르는 카메라에서 앞차와 겹쳐 보이지 않게, FR-053), 카메라는 아이 차를 따라감.
 
 | 항목 | 약속 |
 |---|---|
@@ -419,6 +431,10 @@ export function resumeAudio(): void;                           // (신규)
 export type LifecycleSignal = 'hidden' | 'visible' | 'portrait' | 'landscape' | 'layout' | 'blur'; // (신규)
 /** (신규) 리스너를 달고, 브라우저 기본 제스처(확대·스크롤·길게 누르기 메뉴·당겨서 새로 고침)를 막는다. */
 export function watchLifecycle(on: (signal: LifecycleSignal) => void): void;
+/** (신규, FR-099) 전체화면 → 가로 고정 시도. 사용자 탭 처리 안에서 부름. 이미 전체화면이면 고정만 시도. 거절·미지원은 조용히 무시 */
+export function enterFullscreen(): void;
+/** (신규, FR-099) 전체화면이면 나가고, 아니면 enterFullscreen */
+export function toggleFullscreen(): void;
 ```
 
 | 신호 | 언제 |
@@ -429,7 +445,7 @@ export function watchLifecycle(on: (signal: LifecycleSignal) => void): void;
 | `layout` | 가로 유지 중 크기 변화(가로 180° 뒤집기, 주소창, 화면 분할) |
 | `blur` | `window` `blur` |
 
-- 방향 고정 API를 쓰지 않습니다(FR-007). flow의 반응은 events.md 6장.
+- 방향 고정은 `enterFullscreen`이 시도만 하고 결과에 기대지 않습니다(FR-007, FR-099). 세로 판정·안내는 고정 여부와 상관없이 그대로. flow의 반응은 events.md 6장.
 - `gesturestart`·`dblclick`·`contextmenu`·`touchmove`(passive: false) `preventDefault`(FR-020, SC-005).
 
 ---
@@ -454,7 +470,7 @@ export function watchLifecycle(on: (signal: LifecycleSignal) => void): void;
 | `src/practice/ruleRotation.ts` | `EXTRAS_PER_VIEW` |
 | `src/pedestrianView/pedestrianView.ts` | `PedestrianViewState`, `PedestrianViewEvent` |
 | `src/race/race.ts` | `RaceState`, `RaceEvent`, `FinishResult`, `COUNTDOWN_TICKS`, `CONTACT_SLOW_TICKS` |
-| `src/race/progress.ts` | `RaceCar`, `STUCK_TICKS` |
+| `src/race/progress.ts` | `RaceCar`, `Slot`, `STUCK_TICKS` |
 | `src/storage/save.ts` | `SaveDataV1`, `BestRecord`, `SoundSettings`, `MAX_RECORD_CS` |
 | `src/app/session.ts` | `RunState` |
 | `src/app/loader.ts` | `AssetId`, `ASSET_URLS`, `LoadResult` |

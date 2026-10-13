@@ -40,7 +40,21 @@ const LABELS: Record<ControlButton, string> = {
   pause: '잠깐 멈춤',
 };
 
+// 키보드(있으면): 방향키·WASD는 누르고 있는 버튼, R은 앞뒤 바꾸기(사용자 결정 2026-10-13). e.code라 한글 입력 상태와 무관
+const KEYS: Readonly<Record<string, HoldButton | 'reverse'>> = {
+  ArrowLeft: 'left',
+  KeyA: 'left',
+  ArrowRight: 'right',
+  KeyD: 'right',
+  ArrowUp: 'accel',
+  KeyW: 'accel',
+  ArrowDown: 'brake',
+  KeyS: 'brake',
+  KeyR: 'reverse',
+};
+
 const points = new Map<number, ScreenPoint>();
+const keys = new Set<HoldButton>();
 const buttons = new Map<ControlButton, HTMLElement>();
 const rects = {} as Record<ControlButton, ScreenRect>;
 
@@ -54,7 +68,7 @@ function measure() {
 function showPressed() {
   const pts = [...points.values()];
   for (const [b, el] of buttons) {
-    if (pts.some((p) => inside(p, rects[b]))) el.dataset.pressed = '';
+    if (pts.some((p) => inside(p, rects[b])) || keys.has(b as HoldButton)) el.dataset.pressed = '';
     else delete el.dataset.pressed;
   }
 }
@@ -65,7 +79,7 @@ export function mountControls(layer: HTMLElement, onTap: (button: 'reverse' | 'p
     el.className = `control control-${b}`;
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', LABELS[b]);
-    el.append(picture(`images/ui/control-${b}.svg`, `control-${b}`));
+    el.append(picture(`images/ui/control-${b}.svg`));
     layer.append(el);
     buttons.set(b, el);
   }
@@ -90,14 +104,33 @@ export function mountControls(layer: HTMLElement, onTap: (button: 'reverse' | 'p
   };
   layer.addEventListener('pointerup', lift);
   layer.addEventListener('pointercancel', lift);
+
+  // 조작 버튼이 보이는 화면에서만. 누르고 있는 동안의 반복 입력은 무시 → releaseAll 뒤에는 터치처럼 뗐다가 새로 눌러야 반영.
+  // Cmd·Ctrl·Alt 조합은 브라우저 단축키(Ctrl+R 새로 고침 등)로 둠. macOS는 Cmd를 누른 채 뗀 글자 키의 keyup을 보내지 않아 눌림이 남을 수도 있음
+  window.addEventListener('keydown', (e) => {
+    const b = KEYS[e.code];
+    if (b === undefined || layer.hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (b === 'reverse') onTap(b);
+    else keys.add(b);
+    showPressed();
+  });
+  window.addEventListener('keyup', (e) => {
+    const b = KEYS[e.code];
+    if (b === undefined || b === 'reverse') return;
+    keys.delete(b);
+    showPressed();
+  });
 }
 
 export function readDriveInput(): DriveInput {
-  return toDriveInput(pressedButtons(points.values(), rects));
+  return toDriveInput(new Set([...pressedButtons(points.values(), rects), ...keys]));
 }
 
-/** 좌표 표를 비움. 닿아 있던 손가락은 표에 없으니 뗐다가 새로 눌러야 반영(pointermove는 표에 있는 손가락만 갱신) */
+/** 좌표 표·키를 비움. 닿아 있던 손가락·누르고 있던 키는 뗐다가 새로 눌러야 반영(pointermove는 표에 있는 손가락만 갱신) */
 export function releaseAll(): void {
   points.clear();
+  keys.clear();
   showPressed();
 }

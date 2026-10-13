@@ -222,6 +222,10 @@ describe('콘텐츠 무결성 (content-data.md 4장)', () => {
     expect(DRIVING_SPEC.maxReverseSpeed).toBeLessThan(DRIVING_SPEC.maxForwardSpeed);
     expect(DRIVING_SPEC.stopSnapSpeed).toBeLessThan(DRIVING_SPEC.maxReverseSpeed);
   });
+
+  it('#21 규칙 그림 38장이 ASSET_URLS에 있음 (SC-030, FR-070)', () => {
+    for (const r of SAFETY_RULES) expect([r.id, ASSET_URLS[`images/rules/${r.id}.svg`]]).toEqual([r.id, expect.any(String)]);
+  });
 });
 
 // GLB 읽기 (#14): ?url은 주소만 주므로 같은 import.meta.glob을 ?raw로 써서 내용을 받음.

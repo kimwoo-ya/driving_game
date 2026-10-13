@@ -20,6 +20,11 @@ body {
   pointer-events: none; /* 3D 화면 터치는 아무 동작도 하지 않음(FR-023) */
 }
 
+/* 3D가 없는 화면은 직전 화면의 3D(진열 인물·마을)가 비치지 않게 같은 하늘색만 */
+body:is([data-screen='start'], [data-screen='credits'], [data-screen='practiceMenu']) #stage {
+  visibility: hidden;
+}
+
 /* 겹침 층은 터치를 통과시키고 안의 버튼만 받음 → 운전 중 터치는 아래 #controls로 감 */
 #ui {
   position: fixed;
@@ -46,11 +51,161 @@ body {
   box-shadow: 0 6px 0 #c99a00;
 }
 
-.shape-play {
-  margin-left: 12px;
-  border-top: 36px solid transparent;
-  border-bottom: 36px solid transparent;
-  border-left: 56px solid #fff;
+/* 그림 파일(<img>)은 놓인 자리의 크기를 따르고 터치는 버튼이 받음 */
+#ui img,
+#controls img,
+.storage-notice img {
+  display: block;
+  pointer-events: none;
+}
+
+.big-button img {
+  width: 76%;
+}
+
+.corner-button img,
+.pick-next img {
+  width: 70%;
+}
+
+.control img {
+  width: 80%;
+}
+
+.hud-gear img,
+.hud-cue img {
+  width: 60px;
+}
+
+.hud-stop-first img {
+  width: 112px;
+}
+
+/* 겹침: 멈춤 표시 · 잘못된 행동 · 칭찬 · 레이싱 열림 축하 */
+.overlay img {
+  width: 140px;
+}
+
+.overlay[data-kind='violation'] img:first-child {
+  width: 110px;
+}
+
+.overlay[data-kind='unlocked'] img {
+  width: 240px;
+}
+
+.overlay[data-kind='card'] img {
+  width: min(240px, 44vw);
+}
+
+/* ---- 시작 화면: 안전 연습 · 레이싱 나란히(FR-048) ---- */
+body[data-screen='start'] #ui {
+  gap: 64px;
+}
+
+.big-button[data-locked] {
+  background: #dfe5ea;
+  box-shadow: 0 6px 0 #9aa7b1;
+}
+
+/* 잠긴 레이싱을 누르면 "연습을 모두 마치면 열려요" 그림을 잠깐 */
+.race-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 16px;
+  border-radius: 24px;
+  background: rgb(255 255 255 / 0.92);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.race-hint img {
+  width: 200px;
+}
+
+.race-hint[data-show] {
+  animation: flash 2.4s ease-out;
+}
+
+/* ---- 연습 목록(FR-030): 세 연습 그림, 완료 표시 ---- */
+.menu-row {
+  display: flex;
+  gap: 32px;
+}
+
+.menu-item {
+  position: relative;
+  width: clamp(140px, 26vw, 220px);
+  aspect-ratio: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 6px 0 #b8c4cc;
+}
+
+.menu-item img:first-child {
+  width: 100%;
+}
+
+.menu-done {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 56px;
+}
+
+/* ---- 저장 불가 안내(FR-080): 위쪽 가운데 띠. 터치는 아래 버튼으로 통과(닫기만 받음)하고
+   잠시 뒤 저절로 사라짐 → 닫지 않아도 플레이를 막지 않음 ---- */
+.storage-notice {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 16px);
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 208px); /* 왼쪽 위 기어 표시·오른쪽 위 버튼 자리를 비움 */
+  padding: 8px 8px 8px 12px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 3px 0 #b8c4cc;
+  font-size: 14px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: notice-out 0.4s ease-in 10s forwards; /* 자리값: 보이는 시간(T117) */
+}
+
+@keyframes notice-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.storage-notice img {
+  width: 56px;
+}
+
+.storage-notice p {
+  margin: 0;
+}
+
+.notice-close {
+  flex: none;
+  pointer-events: auto;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #eef2f5;
+}
+
+.notice-close img {
+  width: 100%;
 }
 
 /* 보호자용 작은 버튼(크레딧 열기·돌아가기) */
@@ -68,18 +223,37 @@ body {
   box-shadow: 0 3px 0 #b8c4cc;
 }
 
-.shape-info {
-  width: 10px;
-  height: 26px;
-  border-radius: 5px;
-  background: #2b7bb9;
+.corner-left {
+  right: auto;
+  left: calc(env(safe-area-inset-left) + 16px);
 }
 
-.shape-back {
-  margin-right: 6px;
-  border-top: 14px solid transparent;
-  border-bottom: 14px solid transparent;
-  border-right: 22px solid #2b7bb9;
+/* 세로 안내(FR-007): 시작 화면부터(로딩 진행은 보임) 화면 전체를 덮음 */
+.rotate-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: none;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: #9fd8ff;
+  text-align: center;
+}
+
+body[data-overlays~='rotate']:not([data-screen='boot'], [data-screen='loading']) .rotate-notice {
+  display: grid;
+}
+
+.rotate-notice img {
+  width: min(220px, 60vw);
+}
+
+.rotate-notice p {
+  max-width: 320px;
+  margin: 0;
+  font-size: 15px;
 }
 
 /* 크레딧: 글자 목록, 이 목록만 세로로 넘겨 보고 주소를 골라 볼 수 있음(누르는 링크는 없음, FR-090) */
@@ -285,6 +459,97 @@ body {
   }
 }
 
+/* ---- 레이싱 HUD(FR-055, FR-056): 위 가운데 순위·바퀴·경기 시간, 화면 가운데 카운트다운·출발 그림 ---- */
+.race-stats {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 16px);
+  left: 50%;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+
+.race-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 56px;
+  padding: 0 14px 0 6px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.85);
+  color: #2b2d42;
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.race-stat img {
+  width: 44px;
+}
+
+.race-count {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  color: #ffd23f;
+  font-size: 160px;
+  font-weight: 900;
+  line-height: 1;
+  -webkit-text-stroke: 6px #2b2d42;
+  paint-order: stroke fill;
+}
+
+.race-count img {
+  width: 200px;
+}
+
+.race-count[data-show] {
+  animation: flash 1s ease-out forwards;
+}
+
+/* ---- 레이싱 결과(FR-063, FR-065): 완주 칭찬 그림, 순위·시간·최고 기록, 다시 달리기·시작 화면으로 ---- */
+.race-result {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-radius: 24px;
+  background: rgb(255 255 255 / 0.9);
+}
+
+.race-praise {
+  width: 120px;
+}
+
+.race-result-stats,
+.race-result-buttons {
+  display: flex;
+  gap: 16px;
+}
+
+.race-result-stats .race-stat {
+  background: #eef2f5;
+}
+
+.race-stat[data-new-best] {
+  background: #ffd23f;
+  animation: cue-pulse-bg 1.2s ease-in-out infinite;
+}
+
+@keyframes cue-pulse-bg {
+  50% {
+    background: #fff3c4;
+  }
+}
+
+.race-result-buttons .big-button {
+  width: 104px;
+  height: 104px;
+}
+
 /* ---- 차량·인물 선택: 3D 진열 위 같은 폭의 투명 버튼 열 ---- */
 .pick-row {
   position: absolute;
@@ -314,95 +579,6 @@ body {
 
 .pick-next:disabled {
   opacity: 0.35;
-}
-
-/* ---- 그림 파일이 없을 때의 자리표시 도형(tasks D4) ---- */
-.shape-control-left,
-.shape-control-right {
-  border-top: 22px solid transparent;
-  border-bottom: 22px solid transparent;
-}
-
-.shape-control-left {
-  border-right: 34px solid #333;
-}
-
-.shape-control-right {
-  border-left: 34px solid #333;
-}
-
-.shape-control-accel,
-.shape-cue-accel,
-.shape-gear-forward {
-  border-right: 22px solid transparent;
-  border-left: 22px solid transparent;
-  border-bottom: 34px solid #2fb344;
-}
-
-.shape-control-reverse,
-.shape-cue-reverse,
-.shape-gear-reverse {
-  border-right: 22px solid transparent;
-  border-left: 22px solid transparent;
-  border-top: 34px solid #ff8a00;
-}
-
-.shape-control-brake,
-.shape-cue-brake {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  background: #e5383b;
-}
-
-.shape-control-pause {
-  width: 8px;
-  height: 24px;
-  border-right: 8px solid #333;
-  border-left: 8px solid #333;
-}
-
-.shape-cue-steer {
-  position: relative;
-  width: 72px;
-  height: 44px;
-}
-
-.shape-cue-steer::before,
-.shape-cue-steer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  border-top: 22px solid transparent;
-  border-bottom: 22px solid transparent;
-}
-
-.shape-cue-steer::before {
-  left: 0;
-  border-right: 32px solid #333;
-}
-
-.shape-cue-steer::after {
-  right: 0;
-  border-left: 32px solid #333;
-}
-
-.shape-stop-first {
-  display: grid;
-  place-items: center;
-  width: 112px;
-  height: 112px;
-  border-radius: 50%;
-  background: #e5383b;
-  box-shadow: inset 0 0 0 8px #fff;
-}
-
-.shape-stop-first::after {
-  content: '';
-  width: 64px;
-  height: 16px;
-  border-radius: 8px;
-  background: #fff;
 }
 
 /* ---- 연습 겹침(T059): 위험 직전 멈춤은 화면 전체를 덮어 게임 전체가 멈춘 것으로(FR-037) ---- */
@@ -439,69 +615,3 @@ body {
   text-align: center;
 }
 
-/* 자리표시 도형(tasks D4): 그림 파일이 생기면 같은 이름의 SVG가 대신 쓰임 */
-.shape-game-paused,
-.shape-praise,
-.shape-rule,
-.shape-violation {
-  display: block;
-  width: 120px;
-  height: 120px;
-  border-radius: 24px;
-}
-
-.shape-game-paused {
-  background: linear-gradient(90deg, #4361ee 0 30%, transparent 30% 70%, #4361ee 70%);
-}
-
-.shape-violation {
-  border: 10px solid #f4a261;
-  border-radius: 50%;
-}
-
-.shape-rule {
-  width: 200px;
-  height: 140px;
-  background: #fff;
-  box-shadow: inset 0 0 0 6px #2a9d8f;
-}
-
-.shape-praise {
-  background: #ffd23f;
-  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-}
-
-.shape-cue-stop,
-.shape-cue-wait,
-.shape-cue-go,
-.shape-cue-closer,
-.shape-cue-way {
-  display: block;
-  width: 48px;
-  height: 48px;
-}
-
-.shape-cue-stop {
-  border-radius: 8px;
-  background: #e5383b;
-}
-
-.shape-cue-wait {
-  border: 8px solid #f4a261;
-  border-radius: 50%;
-}
-
-.shape-cue-go,
-.shape-cue-closer {
-  background: #2a9d8f;
-  clip-path: polygon(50% 0, 100% 60%, 70% 60%, 70% 100%, 30% 100%, 30% 60%, 0 60%);
-}
-
-.shape-cue-closer {
-  transform: scale(0.7);
-}
-
-.shape-cue-way {
-  background: #4361ee;
-  clip-path: polygon(0 35%, 60% 35%, 60% 0, 100% 50%, 60% 100%, 60% 65%, 0 65%);
-}

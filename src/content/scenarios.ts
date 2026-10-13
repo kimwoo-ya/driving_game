@@ -67,9 +67,10 @@ const CROSSING: readonly Vec2[] = [
   { x: 6, z: 42 },
   { x: -6, z: 42 },
 ];
+// 보행자 시점 안내는 차가 멈춘 직후(차 빨강·보행자 초록 = 보행자 차례). 차 초록 뒤에 두면 주인공이 빨간불에 건너는 장면이 됨(사용자 지적 2026-10-13)
 const VIEW: PedestrianViewDef = {
   segment: 0,
-  afterStep: 1,
+  afterStep: 0,
   camera: { pos: { x: 8.2, y: 1, z: 41.3 }, lookAt: { x: 0, y: 0.8, z: 42 } }, // 아이 눈높이, 주인공 오른쪽 어깨 뒤(주인공은 화면 왼쪽)
   protagonistPath: [
     { x: 6, z: 42.5 },
@@ -158,7 +159,7 @@ export const SCENARIOS = [
     ],
     pedestrianView: {
       segment: 0,
-      afterStep: 2,
+      afterStep: 0, // 멈춘 직후 보행자 차례(VIEW 주석)
       camera: { pos: { x: 48.2, y: 1, z: 41.3 }, lookAt: { x: 40, y: 0.8, z: 42 } },
       protagonistPath: [
         { x: 46, z: 42.5 },

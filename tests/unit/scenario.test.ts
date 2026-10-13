@@ -315,11 +315,11 @@ describe('B7 검증 지적 재현 (사용자 결정 2026-10-12)', () => {
 });
 
 describe('보행자 시점 안내 연결 (T051)', () => {
-  it('signal-wait 올바른 행동: 멈춤 → 기다림 → 안내 끝까지 → 출발 → 완료', () => {
+  it('signal-wait 올바른 행동: 멈춤 → 안내 끝까지 → 기다림 → 출발 → 완료', () => {
     const r = run(start(), 20_000, correct, (s) => s.phase === 'done');
     expect(r.state.phase).toBe('done');
     const types = r.events.filter((e) => e.type !== 'signalChanged' && e.type !== 'cardShown').map((e) => e.type);
-    expect(types).toEqual(['hint', 'pedestrianViewStart', 'ended', 'hint', 'scenarioCompleted']);
+    expect(types).toEqual(['pedestrianViewStart', 'ended', 'hint', 'hint', 'scenarioCompleted']);
     expect(r.events.filter((e) => e.type === 'hint')).toEqual([
       { type: 'hint', cue: 'wait', repeat: false },
       { type: 'hint', cue: 'go', repeat: false },
@@ -328,10 +328,21 @@ describe('보행자 시점 안내 연결 (T051)', () => {
     expect(viewStart.after.drive.speed).toBe(0);
     expect(r.events.filter((e) => e.type === 'cardShown')).toHaveLength(pickRules('signal-wait', false, 0).rules.length);
     const carLight = (s: ScenarioAttempt) => s.signals.find((x) => x.id === SEG.signal)!.light;
-    expect(carLight(viewStart.after)).toBe('green'); // wait는 진행 신호 뒤에만 끝남
+    expect(carLight(viewStart.after)).toBe('red'); // 멈춘 직후 = 보행자 차례
     expect(carLight(r.state)).toBe('green'); // 출발 뒤에도 다시 노랑이 되지 않음(stoppedTicks가 줄지 않음)
     expect(frontS(r.state)).toBeGreaterThanOrEqual(SEG.path.at(-1)!.z); // 경로 끝에 닿아야 완료
     expect(stepScenario(r.state, GAS, true)).toEqual({ state: r.state, events: [] }); // done은 no-op
+  });
+
+  it('세 상황 모두 안내가 시작되는 순간 보행자 신호는 초록, 차 신호는 초록이 아님 — 주인공이 빨간불에 건너는 장면 금지 (FR-039, FR-094, 사용자 지적 2026-10-13)', () => {
+    for (const def of SCENARIOS) {
+      const view = run(start(def.id), 30_000, correctFor(def), (s) => s.phase === 'pedestrianView').state;
+      expect([def.id, view.phase]).toEqual([def.id, 'pedestrianView']);
+      const seg = def.segments[def.pedestrianView.segment];
+      const light = (id: string | null) => view.signals.find((x) => x.id === id)?.light;
+      if (seg.plan.pedestrianSignal) expect([def.id, light(seg.plan.pedestrianSignal)]).toEqual([def.id, 'green']);
+      if (seg.signal) expect([def.id, light(seg.signal)]).not.toEqual([def.id, 'green']);
+    }
   });
 
   it('안내 중에는 운전 입력·후진 탭을 무시 (FR-041, US2-14)', () => {
@@ -350,7 +361,7 @@ describe('보행자 시점 안내 연결 (T051)', () => {
 
   it('구간을 다시 해도 이미 끝낸 안내는 다시 나오지 않음 (B10)', () => {
     const after = run(start(), 20_000, correct, (s) => s.viewDone).state;
-    expect(after).toMatchObject({ step: 2, viewDone: true });
+    expect(after).toMatchObject({ step: 1, viewDone: true });
     const v = run(after, 3000, hold(RIGHT_GAS), (s) => s.phase === 'explaining');
     const again = run(run(v.state, EXPLAIN_TICKS, hold(IDLE)).state, 20_000, correct, (s) => s.phase === 'done');
     expect(again.events.some((e) => e.type === 'pedestrianViewStart')).toBe(false);

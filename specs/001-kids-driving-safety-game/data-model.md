@@ -221,7 +221,7 @@ type ActorPlan = {                       // 형식 확정(T043, Open Issues 1 �
 | 필드 | 타입 | 범위·기본값 | 근거 |
 |---|---|---|---|
 | `segment` | `number` | 안내가 나오는 구간 번호 | FR-041 |
-| `afterStep` | `number` | 그 구간의 몇 번째 단계를 마친 뒤 나오는지(예: 정지·대기 뒤, 출발 전) | FR-041 "중요한 순간" |
+| `afterStep` | `number` | 그 구간의 몇 번째 단계를 마친 뒤 나오는지. 안내는 신호를 그 순간 상태로 멈춰 보여 주므로 **보행자 차례**(보행자 신호 초록·차 신호 초록 아님)인 단계 뒤에 둠 — 세 연습 모두 멈춘 직후(사용자 지적 2026-10-13: 차 신호 초록 뒤에 두면 주인공이 빨간불에 건너는 장면이 됨) | FR-041 "중요한 순간", FR-039, FR-094 |
 | `camera` | `{ pos: Vec3; lookAt: Vec3 }` | 같은 장소, 아이 눈높이 | FR-041 |
 | `protagonistPath` | `Vec2[]` | Chicken Guy가 서는 곳(첫 점)과 `walk` 행동 때 걷는 길 | FR-096, US2-19 |
 | `introTicks` | `number` | 카메라가 보행자 시점으로 옮겨 가는 길이 | 01_architect "보행자 시점 안내" |
@@ -643,8 +643,8 @@ erDiagram
 | 현재 | 사건 | 가드 | 다음 / 동작 | 근거 |
 |---|---|---|---|---|
 | (실행 시작) | `loadSave`(읽기 + 시험 쓰기·지우기) | 예외 없음 | 저장 값 적용 | FR-079 |
-| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | 접근·읽기 실패 | 기본값으로 시작, `storageNotice = true`, `storageNoticeShown = true` | FR-080, US3-8 |
-| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | 읽기는 됐고 시험 쓰기·지우기만 실패 | 읽은 값(`data`) 적용, `storageNotice = true`, `storageNoticeShown = true`(contracts/storage.md 5장) | FR-079, FR-080, 사용자 결정 2026-10-12 |
+| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | 접근·읽기 실패 | 기본값으로 시작, 시작 화면이 처음 나올 때 `storageNotice = true`, `storageNoticeShown = true`(로딩 중에 띄우면 보호자가 보기 전에 저절로 사라짐) | FR-080, US3-8 |
+| (실행 시작) | `loadSave`가 `ok: false`(저장소 API 예외) | 읽기는 됐고 시험 쓰기·지우기만 실패 | 읽은 값(`data`) 적용, 시작 화면이 처음 나올 때 `storageNotice = true`, `storageNoticeShown = true`(contracts/storage.md 5장) | FR-079, FR-080, 사용자 결정 2026-10-12 |
 | 아무 때 | `commitSave`가 `false`(저장소 API 예외) | — | 메모리 값으로 계속, flow가 아직 안 보였으면 안내 1회. 다음 저장 때 또 시도 | FR-080, spec.md:256 |
 | 아무 때 | 값 손상·변조·모르는 형식 | 저장소 API는 정상 | 해당 항목만 기본값, **안내 없음** | FR-081, 02 결정 B9 |
 
