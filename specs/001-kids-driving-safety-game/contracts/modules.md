@@ -392,6 +392,7 @@ export function racePassenger(): CharacterKindId | null;                        
 ```
 
 - `renderTrack`: 모래 바닥·짙은 남색 노면·빨강/흰 줄무늬 벽·체크무늬 결승선과 문(마을과 구별, FR-052), 아이 차 = 고른 차 + 탑승객 + 바닥 노란 고리(뒤따르는 카메라에서 앞차와 겹쳐 보이지 않게, FR-053), 카메라는 아이 차를 따라감.
+- `renderTown` 연습 길 표시(FR-024, 사용자 결정 2026-10-13): 구간마다 `stopLineS`의 흰 정지선, 멈출 곳 노란 칸(경로를 따라 `stopZone.fromS − bodyLength` ~ `toS`, 차가 칸 안에 다 들어와 서면 맞음), 경로가 꺾이는 구간은 노란 칸 앞 길 위 회전 방향 화살표, 상황마다 마지막 구간 경로 끝에 도착 깃발 문(`trackView.ts`가 내보내는 `finishGate(p, t, width)`를 결승선과 함께 씀), `SignalDef.arrow`가 있는 신호는 신호등 아래 화살표 판. 모두 콘텐츠 데이터에서 그리며 판정에는 쓰지 않음.
 
 | 항목 | 약속 |
 |---|---|

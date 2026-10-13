@@ -149,6 +149,8 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - [X] T061 [US2] Chicken Guy 자세 점검(O3): A11(왼쪽·오른쪽·다시 왼쪽 보기)·A14-A15(손 들기) 카드와 등장 보행자 대기 자세를 브라우저에서 확인하고 들 손을 정해 `src/render/characters.ts` 상수 확정. 기록: `records/tooling-and-render.md`(스크린샷 경로). 검증: 기록에 왼쪽 보기·오른쪽 보기·손 들기 3/3(SC-032 렌더링 점검)
 - [X] T062 [US2] 플레이 확인(quickstart S2 4~6단계): 신호 기다리기 완료, 정지선 넘기 → 멈춤 겹침·같은 구간 처음부터·누르던 버튼 풀림, 소리 없이 카드 자동 진행(US2-13), 조작 익히기 → 연습 바로 이어짐(US3-2). 기록: `records/play-check.md` 신설. 검증: 항목별 예/아니오와 날짜
 
+- [x] T126 [US2] 연습 길 표시·3단계 우회전 화살표 신호(사용자 지적 2026-10-13 "튜토리얼에서 완료를 어떻게 해야 되는건지 막연 … 완료 지점에 대한 표식이 없음 … 3단계는 차량 입장 신호등이 멈추라는건지 가라는건지 안 나옴" → 선택지 중 "우회전 화살표 신호등"·"멈출 곳 노란 칸"·"우회전 길 화살표", 도착 깃발 문은 기본으로 넣음. 이어서 "빨간 화살표면 모퉁이 앞에서 멈춤", 건너는 중에 정지선을 넘으면 "건너는 사람 쪽으로 돌기" 설명; spec FR-024·FR-046, data-model 2.1·4.12·Open Issues 1, modules.md 9장): `src/content/town.ts` `turn-vehicle` 신호(`SignalDef.arrow`), `src/content/scenarios.ts` turning-car(signal `turn-vehicle`, 단계 stop → wait(pedestriansClear) → wait(vehicleGreen) → go, violations에 `ranRed`, 정지선 40·정지 구역 32~40, 보행자 시점 안내 `afterStep` 0), `src/practice/scenario.ts` 판정 한 줄(회전 구간 정지선 + 건너는 사람 → `turnedIntoCrossingPedestrian`), `src/render/townView.ts`(노란 칸·길 화살표·도착 문·화살표 판)와 `src/render/trackView.ts`(`finishGate` 공용), `src/assets/images/ui/cue-go.svg`(깃발 추가). 테스트: `tests/unit/content.test.ts` 1건 추가(아이 차를 마주 보는 차량 신호), `tests/unit/scenario.test.ts` 2건 추가(화살표 신호 2건)·1건 바꿈(예전 "돌기 전~횡단보도 앞 정지 인정" → 모퉁이 앞 정지선)·3건 고침(직진 방향 안내 2건은 초록 화살표 뒤부터, SC-010은 회전 구간 정지선 기준). 기록: `records/play-check.md` 2026-10-13 절. 검증: `npm test`, `npm run build`, `npm run test:e2e`
+
 **Checkpoint**: P1 범위(US1 + US2) 완료 — 교육 핵심을 시연할 수 있음.
 
 ---
@@ -287,7 +289,7 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - [ ] T116 `tests/unit/race.test.ts`에 SC-011 대리 지표 1건 추가 — 기준 운전자(정해 둔 입력 스크립트)로 경기 시간 4:30~5:30. 선행: T115. 검증: `npm test -- tests/unit/race.test.ts`
 - [ ] T117 연습 조정 상수(plan O5): `src/practice/scenario.ts`(`IDLE_HINT_TICKS`, `DEMO_AFTER_FAILS`, `EXPLAIN_TICKS`; 꼭 기다려야 하는 시간은 기기 자동 잠금보다 충분히 짧게)와 `src/practice/ruleRotation.ts`(`EXTRAS_PER_VIEW`, 3~5세 안내 길이). 기록: `records/play-check.md`. 검증: `npm test`
 - [ ] T118 레이싱 조정 상수(plan O5): `src/race/race.ts`(`COUNTDOWN_TICKS`, `CONTACT_SLOW_TICKS`)와 `src/race/progress.ts`(`STUCK_TICKS`). 기록: `records/play-check.md`. 검증: `npm test`
-- [ ] T119 정지 인정 범위(`stopZone`)·ActorPlan 값 조정: `src/content/scenarios.ts`(3~5세 기준 넉넉하게). 기록: `records/play-check.md`. 검증: `npm test`(#16·#17 포함)
+- [ ] T119 정지 인정 범위(`stopZone`)·ActorPlan 값 조정: `src/content/scenarios.ts`(3~5세 기준 넉넉하게). 함께: 3단계에서 돌아 나간 뒤 방향이 조금 틀어지면 오른쪽 보도에 닿는 문제(차선과 보도 사이 여유 1 m, `records/play-check.md` 2026-10-13 T126 절, 사용자 결정 2026-10-13 "지금은 그대로, 기록만"). 기록: `records/play-check.md`. 검증: `npm test`(#16·#17 포함)
 - [ ] T120 실제 기기 시험: SC-002(±0.05초·±0.1 m), SC-003(7상황 × 10회), SC-004, SC-005(각 10회), SC-006, SC-007, SC-012(지원 기기 1회), SC-021(무음 상태와 음원 전부 차단 상태 각각 시작~레이싱 완주, 2/2), SC-023(선정 기기 전체), SC-024, SC-032(15조합 탑승객·Chicken Guy 3/3), plan O7 미확인 항목. 기록: `records/device-check.md`. 검증: SC별 결과·기기·날짜
 - [ ] T121 어린이 플레이 관찰(SC-028, SC-029): 관찰 계획(그룹별 인원·통과 비율 기준)과 결과. 기록: `records/child-observation.md` 신설. 검증: 그룹별 비율과 날짜
 - [ ] T122 문서 맞춤: 점검 결과(O2·O3·O5·O6·O8 등)를 `plan.md` Open Issues와 `research.md`에 함께 반영(plan 결정이 바뀌면 research도 같이). 파일: `specs/001-kids-driving-safety-game/plan.md`, `specs/001-kids-driving-safety-game/research.md`. 검증(문구 검사): 해결된 O 항목마다 결과와 날짜가 있음
@@ -317,11 +319,11 @@ description: "아동용 3D 운전·보행 안전 게임 첫 버전 구현 태스
 - `src/app/flow.ts`: T027 → T039 → T060 → T065 → T077 → T081 → T082 → T085 → T086 → T090 → T095
 - `src/ui/screens.ts`: T026 → T035 → T063 → T076 → T082 → T095
 - `src/ui/hud.ts`: T038 → T059 → T075 / `src/ui/overlays.ts`: T059 → T064 → T084 → T089
-- `src/render/characters.ts`: T033 → T057 → T061 / `src/render/townView.ts`: T037 → T058 → T099
-- `src/practice/scenario.ts`·`tests/unit/scenario.test.ts`: T021 → T048 → T049 → T050 → T051 → T056 → T117
+- `src/render/characters.ts`: T033 → T057 → T061 / `src/render/townView.ts`: T037 → T058 → T126 → T099
+- `src/practice/scenario.ts`·`tests/unit/scenario.test.ts`: T021 → T048 → T049 → T050 → T051 → T056 → T126 → T117
 - `src/race/race.ts`·`tests/unit/race.test.ts`: T018 → T071 → T072 → T073 → T116(T118은 race.ts만)
-- `tests/unit/content.test.ts`: T010 → T012 → T014 → T015 → T017 → T023 → T047 → T055 → T094 → T097 → T100 → T102 → T105 → T108
-- `src/content/town.ts`·`scenarios.ts`: T013 → T053 → T054 → T099(town) / T119(scenarios)
+- `tests/unit/content.test.ts`: T010 → T012 → T014 → T015 → T017 → T023 → T047 → T055 → T094 → T126 → T097 → T100 → T102 → T105 → T108
+- `src/content/town.ts`·`scenarios.ts`: T013 → T053 → T054 → T126 → T099(town) / T119(scenarios)
 
 ### Within Each User Story
 

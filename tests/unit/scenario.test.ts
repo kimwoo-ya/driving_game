@@ -97,6 +97,12 @@ const correctFor =
     return { input: { steer, throttle: goOn, brake: !goOn } };
   };
 
+/** turning-car에서 올바르게 기다려 화살표가 초록이 된 '출발' 단계 상태. 정지선이 모퉁이 앞이라 그 전에 곧장 가면 빨간 화살표 위반 */
+const turnGo = () => {
+  const def = SCENARIOS.find((d) => d.id === 'turning-car')!;
+  return run(start(def.id), 30_000, correctFor(def), (s) => s.phase === 'driving' && def.segments[0].steps[s.step].action === 'go').state;
+};
+
 /** 신호 기다리기 올바른 행동: 정지 구역에서 멈춤 → 진행 신호까지 브레이크 → 출발 */
 const correct: Driver = (s) => {
   if (s.phase !== 'driving') return { input: IDLE };
@@ -210,8 +216,8 @@ describe('경로 문제는 실패가 아님 (T050, FR-034, FR-035)', () => {
     expect(r.state).toMatchObject({ phase: 'driving', step: 0, failStreak: 0 });
   });
 
-  it('wrongWay: 회전 대신 직진해 경로에서 벗어나기 시작한 틱에 hint way 1번', () => {
-    const r = run(start('turning-car'), 2000, hold(GAS), (s) => s.drive.z > 54);
+  it('wrongWay: 초록 화살표에 회전 대신 직진해 경로에서 벗어나기 시작한 틱에 hint way 1번', () => {
+    const r = run(turnGo(), 2000, hold(GAS), (s) => s.drive.z > 54);
     expect(r.events.filter((e) => e.type === 'hint')).toEqual([{ type: 'hint', cue: 'way', repeat: false }]);
     expect(r.state).toMatchObject({ phase: 'driving', failStreak: 0 });
     // 계속 직진하면 경로에서 더 벗어나 구간 다시(leftPath)
@@ -262,7 +268,7 @@ describe('세 상황 완료와 남은 잘못된 행동 2종 (T056)', () => {
     }
   });
 
-  it('SC-010: 보행자가 건너는 중 횡단보도로 들어가려 하면 enteredCrosswalkWithPedestrian·turnedIntoCrossingPedestrian', () => {
+  it('SC-010: 보행자가 건너는 중 횡단보도로 들어가려 하면(회전은 모퉁이 앞 정지선을 넘으려 하면) enteredCrosswalkWithPedestrian·turnedIntoCrossingPedestrian', () => {
     const cases = [
       ['crossing-check', 'enteredCrosswalkWithPedestrian'],
       ['turning-car', 'turnedIntoCrossingPedestrian'],
@@ -274,6 +280,8 @@ describe('세 상황 완료와 남은 잘못된 행동 2종 (T056)', () => {
       const gas: Driver = (s) => ({ input: { steer: steerAlong(def.segments[0].path, s.drive), throttle: true, brake: false } });
       const v = run(crossing, 600, gas, (s) => s.phase === 'explaining');
       expect(v.events.at(-1)).toEqual({ type: 'violation', kind });
+      // 회전 구간은 횡단보도보다 앞인 정지선에서 멈춤(사용자 결정 2026-10-13). 두 구간 모두 곧은 길이라 s = z
+      expect(corners(v.state).every((c) => c.z <= def.segments[0].stopLineS + 1e-9)).toBe(true);
       const reset = run(v.state, EXPLAIN_TICKS, hold(IDLE));
       expect(reset.events).toEqual([{ type: 'segmentReset' }, { type: 'hint', cue: 'stop', repeat: false }]);
     }
@@ -294,23 +302,54 @@ describe('B7 검증 지적 재현 (사용자 결정 2026-10-12)', () => {
     expect(ok(r)).toEqual([]);
   });
 
-  it('turning-car: 회전하기 전(교차로 앞)에 멈춰도 정지로 인정하고 완료 (FR-046, US2-7)', () => {
+  it('turning-car: 빨간 화살표면 모퉁이 앞 정지선에서 멈춰야 함 — 돌아 들어가 횡단보도 앞에서 서려 하면 ranRed, 차는 정지선 앞 (사용자 결정 2026-10-13)', () => {
     const def = SCENARIOS.find((d) => d.id === 'turning-car')!;
-    const r = run(start('turning-car'), 30_000, correctFor(def, 44), (s) => s.phase === 'done');
-    expect(r.state.phase).toBe('done');
-    expect(ok(r)).toEqual([]);
-    expect(r.events).not.toContainEqual({ type: 'hint', cue: 'closer', repeat: false });
+    const seg = def.segments[0];
+    const [a, b] = seg.path;
+    expect(seg.stopLineS).toBeLessThanOrEqual(Math.hypot(b.x - a.x, b.z - a.z)); // 경로가 처음 꺾이기(모퉁이) 전
+    const v = run(start('turning-car'), 30_000, correctFor(def, 58), (s) => s.phase === 'explaining');
+    expect(v.events.at(-1)).toEqual({ type: 'violation', kind: 'ranRed' });
+    expect(corners(v.state).every((c) => c.z <= seg.stopLineS + 1e-9)).toBe(true); // 곧은 길이라 s = z
   });
 
-  it('turning-car: 차선 안 어느 자리에서 곧장 가도 실패가 아니라 방향 안내 → 구간 다시 (FR-034)', () => {
+  it('turning-car: 초록 화살표에 차선 안 어느 자리에서 곧장 가도 실패가 아니라 방향 안내 → 구간 다시 (FR-034)', () => {
     // 차체 원(반지름 1 m)이 오른쪽 보도(x ≤ 116)에 닿지 않는 차선 안 + 교차로 안에서 오른쪽으로 쏠린 차(116.6, 44)
+    const go = turnGo();
     for (const [x, z] of [[117.05, 0], [117.3, 0], [118, 0], [119, 0], [116.6, 44]]) {
-      const s = { ...start('turning-car'), drive: restingAt({ x, z, heading: 0 }) };
+      const s = { ...go, drive: restingAt({ x, z, heading: 0 }) };
       const r = run(s, 1500, hold(GAS), (st) => st.drive.z < 1 && st !== s && st.drive.speed === 0);
       expect([x, r.events.filter((e) => e.type === 'violation')]).toEqual([x, []]);
       expect(r.events).toContainEqual({ type: 'hint', cue: 'way', repeat: false });
       expect(r.events).toContainEqual({ type: 'redirect', issue: 'leftPath' });
     }
+  });
+});
+
+describe('turning-car 우회전 화살표 신호 (사용자 결정 2026-10-13)', () => {
+  const def = SCENARIOS.find((d) => d.id === 'turning-car')!;
+  const seg = def.segments[0];
+  const light = (s: ScenarioAttempt, id: string | null) => s.signals.find((x) => x.id === id)?.light;
+
+  it('다가가면 화살표 빨강·보행자 초록, 보행자가 다 건넌 뒤에야 화살표 초록(그때 보행자 빨강), 그 뒤 출발해 완료', () => {
+    const r = run(start('turning-car'), 30_000, correctFor(def), (st) => st.phase === 'done');
+    expect(r.state.phase).toBe('done');
+    const stopped = r.log.find((l) => l.after.stoppedTicks > 0)!.after;
+    expect([light(stopped, seg.signal), light(stopped, seg.plan.pedestrianSignal)]).toEqual(['red', 'green']);
+    const turnedGreen = r.log.find((l) => light(l.before, seg.signal) !== 'green' && light(l.after, seg.signal) === 'green')!.after;
+    expect(turnedGreen.pedestrians.every((p) => p.state === 'crossed')).toBe(true);
+    expect(light(turnedGreen, seg.plan.pedestrianSignal)).toBe('red');
+    // 화살표가 초록이 되기 전에는 '출발' 단계가 아님
+    expect(r.log.filter((l) => light(l.after, seg.signal) !== 'green').every((l) => seg.steps[l.after.step].action !== 'go')).toBe(true);
+  });
+
+  it('보행자가 다 건넜어도 화살표가 빨강일 때 돌아 나가면 위험 직전 멈춤(earlyStart)', () => {
+    const cleared = run(start('turning-car'), 30_000, correctFor(def), (st) =>
+      st.phase === 'driving' && st.pedestrians.every((p) => p.state === 'crossed') && light(st, seg.signal) === 'red',
+    ).state;
+    expect(light(cleared, seg.signal)).toBe('red');
+    const gas: Driver = (st) => ({ input: { steer: steerAlong(seg.path, st.drive), throttle: true, brake: false } });
+    const v = run(cleared, 600, gas, (st) => st.phase === 'explaining');
+    expect(v.events.at(-1)).toEqual({ type: 'violation', kind: 'earlyStart' });
   });
 });
 

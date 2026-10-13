@@ -86,15 +86,26 @@ function buildTrack(): THREE.Group {
     });
   }
 
-  // 결승선(체크포인트 0): 바닥 체크무늬 두 줄 + 같은 무늬의 문
+  // 결승선(체크포인트 0)
   const { p, t } = pointOnTrack(TRACK, TRACK.checkpoints[0].arc);
+  g.add(finishGate(p, t, TRACK.width));
+
+  marker = new THREE.Mesh(new THREE.RingGeometry(RING.inner, RING.outer, 32), new THREE.MeshBasicMaterial({ color: 0xffd23f }));
+  marker.rotation.x = -Math.PI / 2;
+  g.add(marker);
+  return g;
+}
+
+/** 바닥 체크무늬 두 줄 + 같은 무늬의 문. p = 가운데, t = 진행 방향(단위 벡터), width = 폭(m). 트랙 결승선·연습 도착 지점 공용 */
+export function finishGate(p: Vec2, t: Vec2, width: number): THREE.Group {
+  const g = new THREE.Group();
   const nrm = { x: t.z, z: -t.x };
   const check = [lambert(0x111111), lambert(0xffffff)];
   const heading = Math.atan2(t.x, t.z);
-  const cols = Math.round(TRACK.width / CHECK);
+  const cols = Math.round(width / CHECK);
   for (let row = 0; row < 2; row++) {
     for (let c = 0; c < cols; c++) {
-      const across = -TRACK.width / 2 + (c + 0.5) * CHECK;
+      const across = -width / 2 + (c + 0.5) * CHECK;
       const along = (row - 0.5) * CHECK;
       const tile = box(CHECK, 0.02, CHECK, check[(row + c) % 2]);
       tile.position.set(p.x + nrm.x * across + t.x * along, 0.04, p.z + nrm.z * across + t.z * along);
@@ -108,14 +119,10 @@ function buildTrack(): THREE.Group {
   }
   for (const side of [1, -1]) {
     const post = box(0.3, ARCH_HEIGHT + CHECK, 0.3, check[0]);
-    const off = side * (TRACK.width / 2 + WALL.thick);
+    const off = side * (width / 2 + WALL.thick);
     post.position.set(p.x + nrm.x * off, (ARCH_HEIGHT + CHECK) / 2, p.z + nrm.z * off);
     g.add(post);
   }
-
-  marker = new THREE.Mesh(new THREE.RingGeometry(RING.inner, RING.outer, 32), new THREE.MeshBasicMaterial({ color: 0xffd23f }));
-  marker.rotation.x = -Math.PI / 2;
-  g.add(marker);
   return g;
 }
 

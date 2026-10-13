@@ -26,8 +26,9 @@ export type AreaId =
   | 'turn-sidewalk-north-right'
   | 'turn-sidewalk-south'
   | 'turn-building';
-export type SignalId = 'main-vehicle' | 'main-pedestrian' | 'cross-vehicle' | 'cross-pedestrian' | 'turn-pedestrian';
-export type SignalDef = { id: SignalId; kind: 'vehicle' | 'pedestrian'; pose: Pose };
+export type SignalId = 'main-vehicle' | 'main-pedestrian' | 'cross-vehicle' | 'cross-pedestrian' | 'turn-vehicle' | 'turn-pedestrian';
+/** arrow: 그 방향 회전 전용 신호(신호등 아래 화살표 판). 켜지는 등의 색·모양은 보통 차량 신호와 같음(FR-025) */
+export type SignalDef = { id: SignalId; kind: 'vehicle' | 'pedestrian'; pose: Pose; arrow?: 'right' };
 export type SceneElementId =
   | 'parked-cars'
   | 'reversing-car'
@@ -87,6 +88,8 @@ export const TOWN = {
     { id: 'main-pedestrian', kind: 'pedestrian', pose: { x: -5, z: 45, heading: Math.PI / 2 } },
     { id: 'cross-vehicle', kind: 'vehicle', pose: { x: 35, z: 39, heading: Math.PI } },
     { id: 'cross-pedestrian', kind: 'pedestrian', pose: { x: 35, z: 45, heading: Math.PI / 2 } },
+    // 우회전 화살표 신호(사용자 결정 2026-10-13): 회전 전 오른쪽 보도에서 다가오는 아이 차 쪽(−Z)을 봄. 짝 보행자 신호는 turn-pedestrian
+    { id: 'turn-vehicle', kind: 'vehicle', pose: { x: 115, z: 41, heading: Math.PI }, arrow: 'right' },
     { id: 'turn-pedestrian', kind: 'pedestrian', pose: { x: 107, z: 47, heading: 0 } }, // 북쪽에서 기다리는 보행자 쪽(+Z)
   ],
   props: [],

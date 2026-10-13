@@ -29,7 +29,7 @@ export function initActors(segment: SegmentDef): { signals: SignalState[]; pedes
   const { signal, plan } = segment;
   const signals: SignalState[] = [];
   if (signal) signals.push({ id: signal, light: 'green' });
-  // 차 신호가 없는 구간(회전 방향 횡단보도)의 보행자 신호는 초록 그대로
+  // 차 신호가 없는 구간의 보행자 신호는 초록 그대로(지금 세 연습은 모두 차 신호가 있음)
   if (plan.pedestrianSignal) signals.push({ id: plan.pedestrianSignal, light: signal ? 'red' : 'green' });
   const pedestrians = plan.pedestrians.map((p, i): TownPedestrian => ({
     state: 'waiting',

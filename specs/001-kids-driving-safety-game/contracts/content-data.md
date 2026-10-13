@@ -45,6 +45,7 @@
 - 잘못된 행동 6종 각각이 적어도 한 구간의 `violations`에 들어 있음(SC-010을 시험할 수 있게).
 - `pedestrianView.segment`·`afterStep`은 실제 구간·단계를 가리킴. `introTicks ≥ 0`. 올바른 운전으로 안내가 시작되는 순간 그 구간의 보행자 신호는 초록, 차 신호는 초록이 아님(`tests/unit/scenario.test.ts` "빨간불에 건너는 장면 금지", 사용자 지적 2026-10-13).
 - 신호 변화·보행자 출발은 `ActorPlan`(잠정 형식)으로 플레이어 위치·정지에 맞춰 일어나게 적음(FR-039, FR-040).
+- 구간마다 아이 차를 마주 보는 차량 신호(`signal`)가 있음 — 뒷면만 보이는 신호 금지. 회전 전용 신호는 `SignalDef.arrow`(`tests/unit/content.test.ts`, 사용자 지적 2026-10-13).
 - `TOWN.props`: 규칙이 요구하는 `sceneElements`마다 같은 상황 근처(`near`)에 1개 이상. 버스·통학버스·정류장·육교/지하도·굴러가는 공·차 밑 물건은 기본 도형(외부 자료 없음, 02 결정 A4).
 
 ### `TRACK`

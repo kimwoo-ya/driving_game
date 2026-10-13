@@ -184,7 +184,7 @@ type SafetyActionStep =
 type ActorPlan = {                       // 형식 확정(T043, Open Issues 1 해결)
   redAtS: number | null;                 // 차체 앞 끝이 이 s를 지나면 정지 신호(정지선까지 최대 속도 제동 거리 + 여유 이상 앞)
   greenAfterStoppedTicks: number | null; // stopZone에서 멈춘 뒤 이만큼 지나면 진행 신호
-  pedestrianSignal: SignalId | null;     // 구간 차 신호(signal)와 짝인 보행자 신호. 차 신호가 없는 구간(회전 방향 횡단보도)은 초록 고정
+  pedestrianSignal: SignalId | null;     // 구간 차 신호(signal)와 짝인 보행자 신호. 차 신호가 없는 구간은 초록 고정(지금 세 연습은 모두 차 신호가 있음)
   pedestrians: {
     path: Vec2[];                        // 보도 대기 위치 → 건너편
     poses: CharacterPose[];              // 건너기 전 보여 줄 올바른 행동 순서(예: lookLeft, lookRight, lookLeft, raiseHand)
@@ -197,7 +197,7 @@ type ActorPlan = {                       // 형식 확정(T043, Open Issues 1 �
 
 | `ViolationKind` | 판정(요약) | FR-033 | SC-010 |
 |---|---|---|---|
-| `turnedIntoCrossingPedestrian` | 회전 경로에서 보행자가 건너는 중인 횡단보도에 차체 앞 끝이 들어감 | 보행자가 건너는 횡단보도로 회전 | 회전 시 기다리지 않음 |
+| `turnedIntoCrossingPedestrian` | 회전 경로에서 보행자가 건너는 중인 횡단보도에 차체 앞 끝이 들어감. 회전 구간은 정지선(모퉁이 앞)이 횡단보도보다 앞이라, 보행자가 건너는 중에 `go` 전 단계에서 정지선을 넘으려 해도 이것으로 판정(사용자 결정 2026-10-13) | 보행자가 건너는 횡단보도로 회전 | 회전 시 기다리지 않음 |
 | `enteredCrosswalkWithPedestrian` | 직진 경로에서 보행자가 건너는 중인 횡단보도에 들어감 | 보행자가 건너는 횡단보도로 진입 | 보행자 횡단 중 출발 |
 | `ranRed` | `stop` 단계, 차 신호 노랑·빨강, 이 구간 시도에서 한 번도 멈추지 않은 채 정지선을 넘으려 함 | 정지 신호에 멈추지 않고 통과 | 멈추지 않고 통과 |
 | `earlyStart` | `wait` 단계(멈춘 뒤)에서 조건 충족 전에 정지선을 넘으려 함 | 안전해지기 전 출발 | 정지 신호 중 출발 |
@@ -231,7 +231,7 @@ type ActorPlan = {                       // 형식 확정(T043, Open Issues 1 �
 | 필드 | 타입 | 설명 | 근거 |
 |---|---|---|---|
 | `areas` | `{ id: AreaId; kind: 'road' \| 'crosswalk' \| 'sidewalk' \| 'building'; rect: Rect }[]` | 판정 구역. 건물은 이동 차단 + 감속, 보도 진입은 `enteredSidewalk` | FR-033, FR-035 |
-| `signals` | `SignalDef[]` = `{ id: SignalId; kind: 'vehicle' \| 'pedestrian'; pose: Pose }[]` | 차량 신호와 보행자 신호를 따로 둠 | FR-042 |
+| `signals` | `SignalDef[]` = `{ id: SignalId; kind: 'vehicle' \| 'pedestrian'; pose: Pose; arrow?: 'right' }[]` | 차량 신호와 보행자 신호를 따로 둠. `arrow`는 그 방향 회전 전용 차량 신호(신호등 아래 화살표 판, 켜지는 등은 보통 차량 신호와 같음, 사용자 결정 2026-10-13) | FR-042, FR-046 |
 | `props` | `ScenePropPlacement[]` = `{ element: SceneElementId; near: ScenarioId; pose: Pose }[]` | 세 연습 장소 주변 장면 요소 | FR-092 |
 
 - 3D 표현은 이 데이터로 기본 도형(상자·원기둥·평면)을 만들어 그립니다(`src/render/townView.ts`). 버스·통학버스·정류장·육교 등도 기본 도형으로 만들어 외부 자료를 더하지 않습니다(02 결정 A4).
@@ -650,7 +650,7 @@ erDiagram
 
 ### 4.12 교통 신호·등장 보행자
 
-- 차량 신호: 초록 → 노랑 → 빨강 → 초록. 보행자 신호: 빨강 → 초록 → 깜빡임 → 빨강. 같은 횡단보도를 직진으로 지나는 차량 신호 초록과 보행자 신호 초록은 동시에 켜지지 않습니다. 회전 차량은 보행자 초록에도 횡단보도를 지날 수 있다는 점이 `turning-car`의 학습 대상입니다.
+- 차량 신호: 초록 → 노랑 → 빨강 → 초록. 보행자 신호: 빨강 → 초록 → 깜빡임 → 빨강. 같은 횡단보도를 직진으로 지나는 차량 신호 초록과 보행자 신호 초록은 동시에 켜지지 않습니다. `turning-car`는 우회전 화살표 신호와 회전 방향 횡단보도의 보행자 신호가 짝이라 화살표 초록과 보행자 초록도 동시에 켜지지 않습니다(사용자 결정 2026-10-13).
 - 연습 중 변화는 주기가 아니라 플레이어 상태로 일어납니다(`ActorPlan`, 사용자 결정 2026-10-12): 차 신호는 차체 앞 끝이 `redAtS`를 지나면 노랑, 멈추거나 `stopZone`에 들어오면 빨강, `stoppedTicks ≥ greenAfterStoppedTicks` ∧ 보행자 신호 빨강 ∧ 건너는 사람 없음이면 초록. 짝 보행자 신호는 차 빨강이면 초록, `greenAfterStoppedTicks − FLASH_TICKS`부터 깜빡임(단, 아직 건너기 시작하지 않은 보행자가 있으면 미룸 — 보행자는 깜빡임에 새로 출발하지 않으므로, 사용자 결정 2026-10-12), `greenAfterStoppedTicks` 뒤 건너는 사람이 없으면 빨강. 차 신호가 없는 구간의 보행자 신호는 초록 고정. 보행자는 플레이어가 멈췄거나 멈출 수 있는 거리일 때만 출발합니다(FR-039, FR-040). 그래서 멈출지 지나갈지 애매한 순간이 생기지 않습니다(spec.md:278). 사건은 `signalChanged`(신호가 바뀐 틱)뿐이고, 보행자 출발은 렌더러가 state로 그립니다.
 - 등장 보행자: `waiting`(출발 조건이 맞으면 계획의 `poses`를 `POSE_TICKS`씩 차례로) → `crossing`(`walk`, `WALK_SPEED`) → `crossed`. 행동 중에 조건이 깨지면(차가 가까이 달려옴, 보행자 신호 깜빡임) `idle`로 돌아가 처음부터 다시 기다립니다. 건너는 중에는 신호가 바뀌어도 멈추지 않습니다(FR-043). 구간 재시도 때 `waiting`으로 돌아갑니다.
 
@@ -1006,7 +1006,7 @@ function nextExtras(scenario: ScenarioId, cursor: number): RuleId[] {
 
 해결되지 않은 것만 적습니다.
 
-1. **(해결, T043) `ActorPlan` 형식**: `pedestrianSignal` 하나를 더해 세 상황을 표현합니다. signal-wait = 차 신호 + 짝 보행자 신호, 보행자 출발 `pedestrianGreen` / crossing-check = 차 신호 + 짝 보행자 신호(사용자 결정 2026-10-12), 단계 `stop → wait(pedestriansClear) → wait(vehicleGreen) → go`, 출발 `playerStopped` / turning-car = 회전 방향 횡단보도의 보행자 신호만(`signal: null`, 초록 고정), 출발 `playerStopped`(사용자 결정 2026-10-12). 두 상황 모두 정지선을 횡단보도 앞 가장자리에 둠(T053·T054). turning-car 정지 구역은 회전하기 전(차체 앞 끝 40 m, 모퉁이 직전)부터 정지선까지이고, 교차로는 네거리라 회전 대신 직진하면 방향 안내 → 구간 다시(FR-034)(사용자 결정 2026-10-12).
+1. **(해결, T043) `ActorPlan` 형식**: `pedestrianSignal` 하나를 더해 세 상황을 표현합니다. signal-wait = 차 신호 + 짝 보행자 신호, 보행자 출발 `pedestrianGreen` / crossing-check = 차 신호 + 짝 보행자 신호(사용자 결정 2026-10-12), 단계 `stop → wait(pedestriansClear) → wait(vehicleGreen) → go`, 출발 `playerStopped` / turning-car = 우회전 화살표 차 신호 `turn-vehicle` + 회전 방향 횡단보도의 짝 보행자 신호 `turn-pedestrian`, 단계 `stop → wait(pedestriansClear) → wait(vehicleGreen) → go`, 출발 `playerStopped`(사용자 결정 2026-10-13, 그 전에는 보행자 신호만 두고 초록 고정). crossing-check 정지선은 횡단보도 앞 가장자리(T053), turning-car 정지선은 모퉁이 앞(차체 앞 끝 40 m, 화살표 신호 바로 앞)이고 정지 구역은 32~40 m(사용자 결정 2026-10-13: 빨간 화살표면 모퉁이를 돌기 전에 멈춤 — 2026-10-12의 "돌기 전부터 횡단보도 앞까지 인정"을 바꿈). 교차로는 네거리라 초록 화살표에 회전 대신 직진하면 방향 안내 → 구간 다시(FR-034), 빨간 화살표에 정지선을 넘으면 잘못된 행동(사용자 결정 2026-10-12·13).
 2. **값 미정**: `EXTRAS_PER_VIEW`, `durationTicks`, `introTicks`, `EXPLAIN_TICKS`, `IDLE_HINT_TICKS`, `DEMO_AFTER_FAILS`, `STUCK_TICKS`, `CONTACT_SLOW_TICKS`, `COUNTDOWN_TICKS`, `POSE_TICKS`, `WALK_SPEED`, `FLASH_TICKS`, `STOP_MARGIN`, `WAY_OFFSET`, `LEAVE_OFFSET`, `LEAVE_BACK`, `DRIVING_SPEC` 값, 바퀴 수(2 잠정)는 콘텐츠 설계·플레이 점검에서 정합니다. 형식은 확정입니다.
 3. **(해결, 리더 결정 B17) `AiProfile.targetSpeedRatio`와 FR-054**: 목표 속도 비율은 "액셀을 언제 떼는지"라는 주행 방식이고 성능 한도(`DRIVING_SPEC`)는 모든 차가 같으므로 FR-054(난이도는 주행 경로와 반응으로 조절)에 맞습니다. 필드를 유지합니다.
 4. **다른 차량의 탑승객**: 컴퓨터 차량·마을 차량에 탑승객을 태울지와 어떤 모델을 쓸지는 콘텐츠 설계 결정입니다(FR-096). 정해지면 그 차를 놓는 데이터(`AiProfile` 또는 `ScenePropPlacement`)에 `passengers: CharacterKindId[]`를 더합니다.

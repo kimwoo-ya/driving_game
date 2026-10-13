@@ -152,12 +152,15 @@ function judge(s: ScenarioAttempt, cand: DriveState, signals: readonly SignalSta
   const { corners } = front(cand);
   const found: ViolationKind[] = [];
   const crosswalk = TOWN.areas.find((a) => a.id === seg.crosswalk)?.rect;
+  const crossing = peds.some((p) => p.state === 'crossing');
   // 직진·회전 구분은 구간 violations가 정함(둘 중 하나만 둠)
-  if (crosswalk && peds.some((p) => p.state === 'crossing') && corners.some((c) => inRect(c, crosswalk))) {
+  if (crosswalk && crossing && corners.some((c) => inRect(c, crosswalk))) {
     found.push('turnedIntoCrossingPedestrian', 'enteredCrosswalkWithPedestrian');
   }
   const action = cueOf(seg, s.step);
   if (action !== 'go' && corners.some((c) => project(seg.path, c).s > seg.stopLineS)) {
+    // 회전 구간은 정지선(모퉁이 앞)이 횡단보도보다 먼저라, 건너는 사람이 있을 때 넘으면 그쪽으로 돌려는 것(사용자 결정 2026-10-13)
+    if (crossing) found.push('turnedIntoCrossingPedestrian');
     const light = signals.find((x) => x.id === seg.signal)?.light;
     if (action === 'wait') found.push('earlyStart');
     else if ((light === 'yellow' || light === 'red') && !s.stoppedOnce) found.push('ranRed');

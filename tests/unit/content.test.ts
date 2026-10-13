@@ -180,6 +180,18 @@ describe('콘텐츠 무결성 (content-data.md 4장)', () => {
     }
   });
 
+  it('세 연습 모두 아이 차를 마주 보는 차량 신호가 있음 — 뒷면만 보이는 신호 금지 (FR-024, FR-042, 사용자 지적 2026-10-13)', () => {
+    for (const def of SCENARIOS) {
+      for (const seg of def.segments) {
+        const sig = TOWN.signals.find((x) => x.id === seg.signal);
+        expect([def.id, sig?.kind]).toEqual([def.id, 'vehicle']);
+        // 신호 앞면(heading 방향)이 출발 방향의 반대 = 다가오는 차 쪽
+        const facing = Math.cos(sig!.pose.heading - (seg.start.heading + Math.PI));
+        expect([def.id, facing > 0.99]).toEqual([def.id, true]);
+      }
+    }
+  });
+
   it('#18 트랙', () => {
     const r = DRIVING_SPEC.bodyRadius;
     const arcs = TRACK.checkpoints.map((c) => c.arc);

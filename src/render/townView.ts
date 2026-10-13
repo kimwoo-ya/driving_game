@@ -3,14 +3,15 @@ import type { PlaySession } from '../app/flow';
 import type { CharacterKindId } from '../content/characters';
 import { SAFETY_RULES } from '../content/rules';
 import { SCENARIOS, type SegmentDef } from '../content/scenarios';
-import { type SignalId, TOWN } from '../content/town';
+import { type SignalDef, type SignalId, TOWN } from '../content/town';
 import type { DrivingLessonState } from '../practice/drivingLesson';
 import type { ScenarioAttempt } from '../practice/scenario';
 import type { SignalState } from '../practice/townActors';
-import type { Vec2 } from '../sim/vehicle';
+import { DRIVING_SPEC, type Vec2 } from '../sim/vehicle';
 import { animateCharacters, pedestrianObject, seatPassenger, setPose } from './characters';
 import { cloneModel, preparedModel } from './models';
 import type { Stage } from './stage';
+import { finishGate } from './trackView';
 
 // 기본 도형 색·높이(m)
 const LOOK = {
@@ -23,6 +24,10 @@ const STRIPE = 0.5; // 횡단보도 줄 폭(m)
 const LANE_HALF = 2; // 정지선 길이의 반(차선 폭 4 m)
 const SIGNAL_HEIGHT = 3;
 const EMPHASIS = 1.4; // 운전 중 차 신호, 안내 중 보행자 신호를 크게(FR-042)
+// 연습 길 표시(사용자 결정 2026-10-13, FR-024): 멈출 곳 노란 칸, 회전 방향 길 화살표, 경로 끝 도착 깃발 문
+const ZONE_WIDTH = 3.4; // m, 차선(4 m) 안
+const GATE_WIDTH = 4; // m, 차선 폭
+const TURN_ARROW_GAP = 9; // 길 화살표 시작 = 노란 칸 시작보다 이만큼 앞(m)
 const FLASH_MS = 400; // 보행자 초록 깜빡임(꾸밈, 실제 시간)
 const SKY = new THREE.Color(0x9fd8ff);
 const WEATHER = { rain: new THREE.Color(0x8a96a3), dark: new THREE.Color(0x1d2a44) } as const;
@@ -49,7 +54,18 @@ function lamp(geometry: THREE.BufferGeometry, on: number, x: number, y: number):
   return { mesh, on: new THREE.Color(on) };
 }
 
-function signalView(kind: 'vehicle' | 'pedestrian'): SignalView {
+// 회전 전용 신호: 신호등 아래 파란 판에 흰 화살표(위에 두면 가까이 갈 때 화면 위로 잘림). 판 앞면이 +Z라 신호를 heading만큼 돌리면
+// 다가오는 차 쪽, 'right' = 운전자 오른쪽 = 판의 +X
+function arrowPlate(): THREE.Object3D {
+  const plate = box(0.9, 0.55, 0.06, 0x2f6fde);
+  plate.position.set(0, -0.55, 0.12);
+  const pts = [[-0.3, -0.06], [0.06, -0.06], [0.06, -0.17], [0.32, 0], [0.06, 0.17], [0.06, 0.06], [-0.3, 0.06]];
+  const arrow = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)))), new THREE.MeshBasicMaterial({ color: WHITE }));
+  arrow.position.set(0, -0.55, 0.16);
+  return new THREE.Group().add(plate, arrow);
+}
+
+function signalView({ kind, arrow }: SignalDef): SignalView {
   const obj = new THREE.Group();
   const pole = box(0.15, SIGNAL_HEIGHT, 0.15, 0x444444);
   pole.position.y = SIGNAL_HEIGHT / 2;
@@ -70,6 +86,7 @@ function signalView(kind: 'vehicle' | 'pedestrian'): SignalView {
         };
   head.add(kind === 'vehicle' ? box(1.2, 0.4, 0.3, 0x222222) : box(0.45, 0.85, 0.3, 0x222222));
   for (const l of Object.values(lamps)) head.add(l.mesh);
+  if (arrow) head.add(arrowPlate());
   return { kind, obj, lamps };
 }
 
@@ -121,15 +138,77 @@ function buildTown(): THREE.Group {
     line.rotation.y = heading;
     g.add(line);
   }
+  const zone = new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.85, depthWrite: false });
+  for (const def of SCENARIOS) {
+    for (const seg of def.segments) {
+      // 멈출 곳: 판정은 차 앞 끝이 stopZone 안이라, 차가 칸 안에 다 들어와 서면 맞도록 차 길이만큼 뒤로 늘림
+      paintAlong(g, seg.path, seg.stopZone.fromS - DRIVING_SPEC.bodyLength, seg.stopZone.toS, zone);
+      const side = turnSide(seg.path);
+      if (side) {
+        const at = along(seg.path, seg.stopZone.fromS - DRIVING_SPEC.bodyLength - TURN_ARROW_GAP);
+        const arrow = turnArrow(side);
+        arrow.position.set(at.p.x, 0, at.p.z);
+        arrow.rotation.y = at.heading;
+        g.add(arrow);
+      }
+    }
+    const path = def.segments[def.segments.length - 1].path;
+    const [a, b] = path.slice(-2);
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    g.add(finishGate(b, { x: (b.x - a.x) / len, z: (b.z - a.z) / len }, GATE_WIDTH)); // '출발하기'를 마치는 경로 끝
+  }
   signals = new Map();
   for (const def of TOWN.signals) {
-    const v = signalView(def.kind);
+    const v = signalView(def);
     v.obj.position.set(def.pose.x, 0, def.pose.z);
     v.obj.rotation.y = def.pose.heading;
     g.add(v.obj);
     signals.set(def.id, v);
   }
   return g;
+}
+
+// 경로 위 [a, b] 구간을 폭 ZONE_WIDTH의 이어진 띠로 칠함(꺾인 곳은 양쪽 선분 방향의 가운데로 벌림). 바닥 평면은 (x, −z)로 두고 −90° 눕힘
+function paintAlong(g: THREE.Group, path: readonly Vec2[], a: number, b: number, material: THREE.Material) {
+  const marks: number[] = [a];
+  let acc = 0;
+  for (let i = 1; i < path.length - 1; i++) {
+    acc += Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z);
+    if (acc > a && acc < b) marks.push(acc);
+  }
+  marks.push(b);
+  const left: THREE.Vector2[] = [];
+  const right: THREE.Vector2[] = [];
+  for (const s of marks) {
+    const { p } = along(path, s);
+    const [back, fwd] = [along(path, s - 0.01).heading, along(path, s + 0.01).heading]; // 꼭짓점이면 앞뒤 선분 방향이 다름
+    const h = Math.atan2(Math.sin(fwd) + Math.sin(back), Math.cos(fwd) + Math.cos(back));
+    const w = ZONE_WIDTH / 2 / Math.cos((fwd - back) / 2);
+    left.push(new THREE.Vector2(p.x + Math.cos(h) * w, -(p.z - Math.sin(h) * w)));
+    right.push(new THREE.Vector2(p.x - Math.cos(h) * w, -(p.z + Math.sin(h) * w)));
+  }
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([...left, ...right.reverse()])), material);
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.03;
+  g.add(m);
+}
+
+// 경로의 처음과 끝 방향이 45°넘게 다르면 회전: +1 왼쪽, −1 오른쪽(heading이 늘면 왼쪽), 아니면 0
+function turnSide(path: readonly Vec2[]): 1 | -1 | 0 {
+  const h = (a: Vec2, b: Vec2) => Math.atan2(b.x - a.x, b.z - a.z);
+  const d = h(path[path.length - 2], path[path.length - 1]) - h(path[0], path[1]);
+  const turn = Math.atan2(Math.sin(d), Math.cos(d));
+  return Math.abs(turn) < Math.PI / 4 ? 0 : turn > 0 ? 1 : -1;
+}
+
+// 차선 위 꺾인 흰 화살표(앞 = +Z, side +1이면 +X = 왼쪽으로 꺾임). 바닥 평면은 (x, −z)로 두고 −90° 눕힘
+function turnArrow(side: 1 | -1): THREE.Object3D {
+  const pts = [[-0.25, 0], [0.25, 0], [0.25, 5.5], [1, 5.5], [1, 5], [1.9, 5.75], [1, 6.5], [1, 6], [-0.25, 6]];
+  const shape = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x * side, -z)));
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: WHITE }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.035;
+  return new THREE.Group().add(m);
 }
 
 // 구간이 다루지 않는 신호는 차 초록·보행자 빨강으로 둠
