@@ -1,0 +1,507 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #9fd8ff;
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  /* 조작 중 스크롤·확대·길게 누르기 메뉴·글자 선택·당겨서 새로 고침 막기(FR-020, SC-005) */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: block;
+  pointer-events: none; /* 3D 화면 터치는 아무 동작도 하지 않음(FR-023) */
+}
+
+/* 겹침 층은 터치를 통과시키고 안의 버튼만 받음 → 운전 중 터치는 아래 #controls로 감 */
+#ui {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#ui button {
+  pointer-events: auto;
+}
+
+.big-button {
+  display: grid;
+  place-items: center;
+  width: 160px;
+  height: 160px;
+  border: none;
+  border-radius: 50%;
+  background: #ffd23f;
+  box-shadow: 0 6px 0 #c99a00;
+}
+
+.shape-play {
+  margin-left: 12px;
+  border-top: 36px solid transparent;
+  border-bottom: 36px solid transparent;
+  border-left: 56px solid #fff;
+}
+
+/* 보호자용 작은 버튼(크레딧 열기·돌아가기) */
+.corner-button {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 16px);
+  right: calc(env(safe-area-inset-right) + 16px);
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 0 #b8c4cc;
+}
+
+.shape-info {
+  width: 10px;
+  height: 26px;
+  border-radius: 5px;
+  background: #2b7bb9;
+}
+
+.shape-back {
+  margin-right: 6px;
+  border-top: 14px solid transparent;
+  border-bottom: 14px solid transparent;
+  border-right: 22px solid #2b7bb9;
+}
+
+/* 크레딧: 글자 목록, 이 목록만 세로로 넘겨 보고 주소를 골라 볼 수 있음(누르는 링크는 없음, FR-090) */
+.credits {
+  box-sizing: border-box;
+  width: min(720px, calc(100vw - 120px));
+  max-height: calc(100vh - 32px);
+  margin: 0;
+  padding: 12px 16px;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: 16px;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.credits li + li {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #dde3e8;
+}
+
+.credits p {
+  margin: 0;
+}
+
+/* ---- 조작 버튼(FR-013, FR-020, FR-021): 왼쪽 좌·우 조향, 오른쪽 브레이크·액셀, 그 위 후진 전환, 위 일시정지 ---- */
+#controls {
+  --btn: clamp(64px, 20vh, 112px);
+  --gap: 16px;
+  --edge: 24px;
+  --cue-anim: cue-pulse 1.2s ease-in-out infinite;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  touch-action: none;
+}
+
+#controls[hidden] {
+  display: none;
+}
+
+#controls[data-demo] {
+  --cue-anim: cue-demo 0.5s ease-in-out 4, cue-pulse 1.2s ease-in-out 2s infinite; /* 시범 뒤에도 강조는 계속 깜빡임 */
+}
+
+.control {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + var(--edge));
+  display: grid;
+  place-items: center;
+  width: var(--btn);
+  height: var(--btn);
+  border-radius: 24px;
+  background: rgb(255 255 255 / 0.55);
+  box-shadow: 0 4px 0 rgb(0 0 0 / 0.2);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.control[data-pressed] {
+  background: rgb(255 210 63 / 0.9);
+  box-shadow: none;
+  transform: translateY(3px);
+}
+
+.control-left {
+  left: calc(env(safe-area-inset-left) + var(--edge));
+}
+
+.control-right {
+  left: calc(env(safe-area-inset-left) + var(--edge) + var(--btn) + var(--gap));
+}
+
+.control-accel {
+  right: calc(env(safe-area-inset-right) + var(--edge));
+}
+
+.control-brake {
+  right: calc(env(safe-area-inset-right) + var(--edge) + var(--btn) + var(--gap));
+}
+
+.control-reverse {
+  right: calc(env(safe-area-inset-right) + var(--edge));
+  bottom: calc(env(safe-area-inset-bottom) + var(--edge) + var(--btn) + var(--gap));
+  border-radius: 50%;
+  background: rgb(255 170 80 / 0.7);
+}
+
+.control-pause {
+  top: calc(env(safe-area-inset-top) + 16px);
+  right: calc(env(safe-area-inset-right) + var(--edge));
+  bottom: auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+/* 눌러야 할 버튼 강조, 재안내면 누르는 시범(hud.ts가 data-cue·data-demo를 붙임).
+   안전 연습: 멈추기·기다리기(사용자 결정 2026-10-13) = 브레이크, 출발하기 = 액셀 */
+#controls[data-cue='steer'] :is(.control-left, .control-right),
+#controls[data-cue='accel'] .control-accel,
+#controls[data-cue='brake'] .control-brake,
+#controls[data-cue='reverse'] .control-reverse,
+#controls:is([data-cue='stop'], [data-cue='wait']) .control-brake,
+#controls[data-cue='go'] .control-accel {
+  outline: 6px solid #ffd23f;
+  animation: var(--cue-anim);
+}
+
+@keyframes cue-pulse {
+  50% {
+    outline-color: #fff;
+  }
+}
+
+@keyframes cue-demo {
+  50% {
+    transform: translateY(6px) scale(0.9);
+  }
+}
+
+/* ---- HUD ---- */
+.hud-gear,
+.hud-cue {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 16px);
+  display: grid;
+  place-items: center;
+  height: 72px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.8);
+}
+
+.hud-gear {
+  left: calc(env(safe-area-inset-left) + 24px);
+  width: 72px;
+}
+
+.hud-cue {
+  left: 50%;
+  min-width: 96px;
+  transform: translateX(-50%);
+}
+
+.hud-cue:empty {
+  display: none;
+}
+
+/* 경로 문제로 구간을 다시 놓을 때 짧은 화면 전환(events.md 2장 redirect) */
+.hud-fade {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: #9fd8ff;
+}
+
+.hud-fade[data-show] {
+  animation: fade-out 0.5s ease-out;
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.hud-stop-first {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.hud-stop-first[data-show] {
+  animation: flash 1.6s ease-out;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- 차량·인물 선택: 3D 진열 위 같은 폭의 투명 버튼 열 ---- */
+.pick-row {
+  position: absolute;
+  inset: 10% 0 32%;
+  display: flex;
+}
+
+.pick-item {
+  flex: 1;
+  margin: 0 6px;
+  border: none;
+  border-radius: 24px;
+  background: transparent;
+}
+
+.pick-item[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 6px #ffd23f;
+}
+
+.pick-next {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 24px);
+  bottom: calc(env(safe-area-inset-bottom) + 24px);
+  width: 104px;
+  height: 104px;
+}
+
+.pick-next:disabled {
+  opacity: 0.35;
+}
+
+/* ---- 그림 파일이 없을 때의 자리표시 도형(tasks D4) ---- */
+.shape-control-left,
+.shape-control-right {
+  border-top: 22px solid transparent;
+  border-bottom: 22px solid transparent;
+}
+
+.shape-control-left {
+  border-right: 34px solid #333;
+}
+
+.shape-control-right {
+  border-left: 34px solid #333;
+}
+
+.shape-control-accel,
+.shape-cue-accel,
+.shape-gear-forward {
+  border-right: 22px solid transparent;
+  border-left: 22px solid transparent;
+  border-bottom: 34px solid #2fb344;
+}
+
+.shape-control-reverse,
+.shape-cue-reverse,
+.shape-gear-reverse {
+  border-right: 22px solid transparent;
+  border-left: 22px solid transparent;
+  border-top: 34px solid #ff8a00;
+}
+
+.shape-control-brake,
+.shape-cue-brake {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: #e5383b;
+}
+
+.shape-control-pause {
+  width: 8px;
+  height: 24px;
+  border-right: 8px solid #333;
+  border-left: 8px solid #333;
+}
+
+.shape-cue-steer {
+  position: relative;
+  width: 72px;
+  height: 44px;
+}
+
+.shape-cue-steer::before,
+.shape-cue-steer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  border-top: 22px solid transparent;
+  border-bottom: 22px solid transparent;
+}
+
+.shape-cue-steer::before {
+  left: 0;
+  border-right: 32px solid #333;
+}
+
+.shape-cue-steer::after {
+  right: 0;
+  border-left: 32px solid #333;
+}
+
+.shape-stop-first {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: #e5383b;
+  box-shadow: inset 0 0 0 8px #fff;
+}
+
+.shape-stop-first::after {
+  content: '';
+  width: 64px;
+  height: 16px;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* ---- 연습 겹침(T059): 위험 직전 멈춤은 화면 전체를 덮어 게임 전체가 멈춘 것으로(FR-037) ---- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  align-content: center;
+  gap: 24px;
+}
+
+.overlay[data-kind] {
+  display: grid;
+}
+
+.overlay[data-kind='violation'] {
+  background: rgb(255 255 255 / 0.65);
+}
+
+/* 보행자 시점 안내: 주인공은 화면 왼쪽(카메라가 오른쪽 어깨 뒤)이라 카드는 오른쪽에 둠(US2-19, SC-032) */
+.overlay[data-kind='card'] {
+  justify-items: end;
+  padding-right: 4vw;
+}
+
+.overlay[data-kind='card'] p {
+  max-width: 48vw;
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.85);
+  font-size: 18px;
+  text-align: center;
+}
+
+/* 자리표시 도형(tasks D4): 그림 파일이 생기면 같은 이름의 SVG가 대신 쓰임 */
+.shape-game-paused,
+.shape-praise,
+.shape-rule,
+.shape-violation {
+  display: block;
+  width: 120px;
+  height: 120px;
+  border-radius: 24px;
+}
+
+.shape-game-paused {
+  background: linear-gradient(90deg, #4361ee 0 30%, transparent 30% 70%, #4361ee 70%);
+}
+
+.shape-violation {
+  border: 10px solid #f4a261;
+  border-radius: 50%;
+}
+
+.shape-rule {
+  width: 200px;
+  height: 140px;
+  background: #fff;
+  box-shadow: inset 0 0 0 6px #2a9d8f;
+}
+
+.shape-praise {
+  background: #ffd23f;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.shape-cue-stop,
+.shape-cue-wait,
+.shape-cue-go,
+.shape-cue-closer,
+.shape-cue-way {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+
+.shape-cue-stop {
+  border-radius: 8px;
+  background: #e5383b;
+}
+
+.shape-cue-wait {
+  border: 8px solid #f4a261;
+  border-radius: 50%;
+}
+
+.shape-cue-go,
+.shape-cue-closer {
+  background: #2a9d8f;
+  clip-path: polygon(50% 0, 100% 60%, 70% 60%, 70% 100%, 30% 100%, 30% 60%, 0 60%);
+}
+
+.shape-cue-closer {
+  transform: scale(0.7);
+}
+
+.shape-cue-way {
+  background: #4361ee;
+  clip-path: polygon(0 35%, 60% 35%, 60% 0, 100% 50%, 60% 100%, 60% 65%, 0 65%);
+}

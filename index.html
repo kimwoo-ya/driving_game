@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>운전·보행 안전 게임</title>
+    <style>
+      .boot-loading {
+        position: fixed;
+        inset: 0;
+        margin: auto;
+        width: 64px;
+        height: 64px;
+        border: 8px solid #ddd;
+        border-top-color: #f5b400;
+        border-radius: 50%;
+        animation: boot-spin 1s linear infinite;
+      }
+      @keyframes boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="ui"><div class="boot-loading" aria-hidden="true"></div></div>
+    <div id="controls"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

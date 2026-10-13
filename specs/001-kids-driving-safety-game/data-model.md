@@ -173,7 +173,7 @@ type CharacterPose = 'idle' | 'walk' | 'lookLeft' | 'lookRight' | 'raiseHand'; /
 | `violations` | `ViolationKind[]` | 이 구간에서 판정하는 잘못된 행동 | FR-033, SC-010 |
 | `signal` | `SignalId \| null` | 이 구간이 쓰는 차량 신호 | FR-040 |
 | `crosswalk` | `AreaId \| null` | 판정에 쓰는 횡단보도 구역 | FR-033 |
-| `plan` | `ActorPlan` | 신호·보행자가 플레이어 위치·정지에 맞춰 움직이는 계획(잠정, Open Issues 1) | FR-039, FR-040 |
+| `plan` | `ActorPlan` | 신호·보행자가 플레이어 위치·정지에 맞춰 움직이는 계획(형식 확정 T043) | FR-039, FR-040 |
 
 ```ts
 type SafetyActionStep =
@@ -181,9 +181,10 @@ type SafetyActionStep =
   | { action: 'wait'; until: 'vehicleGreen' | 'pedestriansClear' } // 조건까지 speed === 0 유지
   | { action: 'go' };                                              // 조건 뒤 출발, 차체 앞 끝이 path 끝에 닿음
 
-type ActorPlan = {                       // 잠정 형식
+type ActorPlan = {                       // 형식 확정(T043, Open Issues 1 해결)
   redAtS: number | null;                 // 차체 앞 끝이 이 s를 지나면 정지 신호(정지선까지 최대 속도 제동 거리 + 여유 이상 앞)
   greenAfterStoppedTicks: number | null; // stopZone에서 멈춘 뒤 이만큼 지나면 진행 신호
+  pedestrianSignal: SignalId | null;     // 구간 차 신호(signal)와 짝인 보행자 신호. 차 신호가 없는 구간(회전 방향 횡단보도)은 초록 고정
   pedestrians: {
     path: Vec2[];                        // 보도 대기 위치 → 건너편
     poses: CharacterPose[];              // 건너기 전 보여 줄 올바른 행동 순서(예: lookLeft, lookRight, lookLeft, raiseHand)
@@ -198,9 +199,9 @@ type ActorPlan = {                       // 잠정 형식
 |---|---|---|---|
 | `turnedIntoCrossingPedestrian` | 회전 경로에서 보행자가 건너는 중인 횡단보도에 차체 앞 끝이 들어감 | 보행자가 건너는 횡단보도로 회전 | 회전 시 기다리지 않음 |
 | `enteredCrosswalkWithPedestrian` | 직진 경로에서 보행자가 건너는 중인 횡단보도에 들어감 | 보행자가 건너는 횡단보도로 진입 | 보행자 횡단 중 출발 |
-| `ranRed` | `stop` 단계에서 한 번도 멈추지 않고 정지 신호 중에 정지선을 넘음 | 정지 신호에 멈추지 않고 통과 | 멈추지 않고 통과 |
-| `earlyStart` | `wait` 단계(멈춘 뒤)에서 조건 충족 전에 정지선을 넘음 | 안전해지기 전 출발 | 정지 신호 중 출발 |
-| `overStopLine` | 차체 앞 끝이 정지선을 넘은 채 `speed === 0` | 정지 위치를 넘어 진입 | 정지선 초과 |
+| `ranRed` | `stop` 단계, 차 신호 노랑·빨강, 이 구간 시도에서 한 번도 멈추지 않은 채 정지선을 넘으려 함 | 정지 신호에 멈추지 않고 통과 | 멈추지 않고 통과 |
+| `earlyStart` | `wait` 단계(멈춘 뒤)에서 조건 충족 전에 정지선을 넘으려 함 | 안전해지기 전 출발 | 정지 신호 중 출발 |
+| `overStopLine` | `go` 전 단계에서 정지선을 넘으려 하는데 `ranRed`·`earlyStart`가 아님(예: 정지 구역 앞에서 한 번 멈춘 뒤 다시 가서 넘음, 신호 없는 곳에서 넘음). 후보 위치로 판정하므로 차가 실제로 선을 넘은 채 서는 일은 없음(사용자 결정 2026-10-12) | 정지 위치를 넘어 진입 | 정지선 초과 |
 | `enteredSidewalk` | 차체가 보도 구역에 들어감 | 보도 진입 | — |
 
 - 한 틱에 여러 개가 걸리면 위 표의 위쪽 하나만 사건으로 냅니다(보행자 관련 설명을 우선). 사건 이름은 `violation`.
@@ -365,6 +366,9 @@ type PlaySession = { vehicle: VehicleKindId; character: CharacterKindId } &
 | `phaseTicks` | `number` | 현재 단계(설명 등) 경과 틱 | FR-074 |
 | `failStreak` | `number` | 같은 구간 연속 실패 수. `DEMO_AFTER_FAILS`에 닿으면 시범 다시 | FR-034, US2-8 |
 | `idleTicks` | `number` | 안내된 행동이 없는 틱. `IDLE_HINT_TICKS`마다 재안내(실패 아님) | FR-031 |
+| `stoppedTicks` | `number` | `0`. `stop` 단계를 마친(stopZone에서 멈춘) 뒤 지난 운전 틱. 구간 시도 안에서 줄지 않음(`stepTownActors` 입력) | FR-040 |
+| `stoppedOnce` | `boolean` | `false`. 이 구간 시도에서 움직이다 멈춘 적 있음(`ranRed`·`overStopLine` 구분) | FR-033 |
+| `blockedTicks` | `number` | `0`. 건물에 닿은 채 경로 진행이 없는 틱(`blocked`) | FR-035 |
 | `drive` | `DriveState` | 구간 `start` | |
 | `signals` | `SignalState[]` | 구간 시작 상태 | FR-040 |
 | `pedestrians` | `TownPedestrian[]` | 구간 시작 상태 | FR-039 |
@@ -377,8 +381,8 @@ type PlaySession = { vehicle: VehicleKindId; character: CharacterKindId } &
 |---|---|---|---|
 | `rules` | `RuleId[]` | `ScenarioAttempt.picked.rules`(시도 시작 때 `pickRules`가 정한 핵심 전부 + 추가 묶음). 안내 중에 바뀌지 않음 | FR-091 |
 | `extrasCount` | `number` | 이번 묶음의 추가 규칙 수. 끝까지 봤을 때 커서를 이만큼 옮김 | FR-091 |
-| `card` | `number` | `-1` = 카메라 이동(`introTicks`), `0..` = 지금 카드 | FR-041 |
-| `cardTicks` | `number` | 지금 카드(또는 카메라 이동) 경과 틱 | FR-070 |
+| `card` | `number` | `-1` = 카메라 이동(`introTicks`), `0..` = 지금 카드, `rules.length` = 끝남(그 뒤 no-op) | FR-041 |
+| `cardTicks` | `number` | 지금 카드(또는 카메라 이동) 경과 틱. `-1` = `'card'` 되감기 직후(다음 틱이 그 카드의 0틱이라 `cardShown`이 다시 나옴) | FR-070 |
 
 주인공은 언제나 Chicken Guy이므로 인물 필드가 없습니다. 날씨·행동은 지금 카드 규칙의 `weather`·`poses`에서 읽습니다.
 
@@ -387,7 +391,7 @@ type PlaySession = { vehicle: VehicleKindId; character: CharacterKindId } &
 | 타입 | 필드 | 값 | 근거 |
 |---|---|---|---|
 | `SignalState` | `id: SignalId`, `light` | 차량 신호 `'green' \| 'yellow' \| 'red'`, 보행자 신호 `'red' \| 'green' \| 'flashing'` | FR-042, FR-043 |
-| `TownPedestrian` | `state: 'waiting' \| 'crossing' \| 'crossed'`, `pos: Vec2`, `heading: number`, `pose: CharacterPose`, `plan: number`(ActorPlan.pedestrians 순번) | Chicken Guy 고정, 올바른 행동만 | FR-039, FR-096 |
+| `TownPedestrian` | `state: 'waiting' \| 'crossing' \| 'crossed'`, `pos: Vec2`, `heading: number`, `pose: CharacterPose`, `plan: number`(ActorPlan.pedestrians 순번), `ticks: number`(지금 state 경과 틱: 건너기 전 행동 순서·걸은 거리) | Chicken Guy 고정, 올바른 행동만 | FR-039, FR-096 |
 
 #### RaceState — 레이싱 경기 (`src/race/race.ts`, `stepRace`)
 
@@ -647,8 +651,8 @@ erDiagram
 ### 4.12 교통 신호·등장 보행자
 
 - 차량 신호: 초록 → 노랑 → 빨강 → 초록. 보행자 신호: 빨강 → 초록 → 깜빡임 → 빨강. 같은 횡단보도를 직진으로 지나는 차량 신호 초록과 보행자 신호 초록은 동시에 켜지지 않습니다. 회전 차량은 보행자 초록에도 횡단보도를 지날 수 있다는 점이 `turning-car`의 학습 대상입니다.
-- 연습 중 변화는 주기가 아니라 플레이어 상태로 일어납니다(`ActorPlan`): 차체 앞 끝이 `redAtS`를 지나면 정지 신호, `stopZone`에서 멈춘 뒤 `greenAfterStoppedTicks`가 지나면 진행 신호. 보행자는 플레이어가 멈췄거나 멈출 수 있는 거리일 때만 출발합니다(FR-039, FR-040). 그래서 멈출지 지나갈지 애매한 순간이 생기지 않습니다(spec.md:278). 사건은 `signalChanged`(신호가 바뀐 틱)뿐이고, 보행자 출발은 렌더러가 state로 그립니다.
-- 등장 보행자: `waiting`(계획의 `poses`를 차례로) → `crossing`(`walk`) → `crossed`. 구간 재시도 때 `waiting`으로 돌아갑니다.
+- 연습 중 변화는 주기가 아니라 플레이어 상태로 일어납니다(`ActorPlan`, 사용자 결정 2026-10-12): 차 신호는 차체 앞 끝이 `redAtS`를 지나면 노랑, 멈추거나 `stopZone`에 들어오면 빨강, `stoppedTicks ≥ greenAfterStoppedTicks` ∧ 보행자 신호 빨강 ∧ 건너는 사람 없음이면 초록. 짝 보행자 신호는 차 빨강이면 초록, `greenAfterStoppedTicks − FLASH_TICKS`부터 깜빡임(단, 아직 건너기 시작하지 않은 보행자가 있으면 미룸 — 보행자는 깜빡임에 새로 출발하지 않으므로, 사용자 결정 2026-10-12), `greenAfterStoppedTicks` 뒤 건너는 사람이 없으면 빨강. 차 신호가 없는 구간의 보행자 신호는 초록 고정. 보행자는 플레이어가 멈췄거나 멈출 수 있는 거리일 때만 출발합니다(FR-039, FR-040). 그래서 멈출지 지나갈지 애매한 순간이 생기지 않습니다(spec.md:278). 사건은 `signalChanged`(신호가 바뀐 틱)뿐이고, 보행자 출발은 렌더러가 state로 그립니다.
+- 등장 보행자: `waiting`(출발 조건이 맞으면 계획의 `poses`를 `POSE_TICKS`씩 차례로) → `crossing`(`walk`, `WALK_SPEED`) → `crossed`. 행동 중에 조건이 깨지면(차가 가까이 달려옴, 보행자 신호 깜빡임) `idle`로 돌아가 처음부터 다시 기다립니다. 건너는 중에는 신호가 바뀌어도 멈추지 않습니다(FR-043). 구간 재시도 때 `waiting`으로 돌아갑니다.
 
 ### 4.13 동시에 일어나는 사건 처리 (FR-077)
 
@@ -936,6 +940,11 @@ function commitSave(current: Omit<SaveDataV1, 'v'>, changed: 'tutorial' | 'best'
 | `CONTACT_SLOW_TICKS` | 접촉 감속 시간 | FR-060 |
 | `COUNTDOWN_TICKS` | 출발 신호 전 카운트다운 | FR-055 |
 | `MAX_RECORD_CS = 35_999_999` | 저장 가능한 최고 기록 상한(확정) | 5.2 |
+| `POSE_TICKS` | 등장 보행자가 건너기 전 행동 하나를 보이는 틱 | FR-039 |
+| `WALK_SPEED` | 등장 보행자 걷는 속도(m/s) | FR-039 |
+| `FLASH_TICKS` | 진행 신호 몇 틱 전부터 보행자 신호 깜빡임 | FR-043 |
+| `STOP_MARGIN` | 보행자 출발 판단에서 최고 속도 제동 거리에 더하는 여유(m) | FR-039 |
+| `WAY_OFFSET`, `LEAVE_OFFSET`, `LEAVE_BACK` | 경로 문제 판정 거리: 방향 안내(`wrongWay`), 구간 다시(`leftPath`: 옆으로 / 시작 뒤로) | FR-034 |
 | `DRIVING_SPEC`의 값, `stopZone` 크기, `durationTicks`, `introTicks`, `ActorPlan` 값 | 데이터 값 | spec.md:624 |
 
 ---
@@ -997,8 +1006,8 @@ function nextExtras(scenario: ScenarioId, cursor: number): RuleId[] {
 
 해결되지 않은 것만 적습니다.
 
-1. **`ActorPlan` 형식은 잠정입니다**: 신호가 바뀌는 지점, 멈춘 뒤 진행 신호까지의 틱, 보행자 출발 조건(`'playerStopped' | 'pedestrianGreen'`)으로 세 상황을 모두 표현할 수 있는지는 연습 엔진 첫 태스크(자리표시 마을로 상황 1개 구현)에서 확인하고 이 문서를 갱신합니다.
-2. **값 미정**: `EXTRAS_PER_VIEW`, `durationTicks`, `introTicks`, `EXPLAIN_TICKS`, `IDLE_HINT_TICKS`, `DEMO_AFTER_FAILS`, `STUCK_TICKS`, `CONTACT_SLOW_TICKS`, `COUNTDOWN_TICKS`, `DRIVING_SPEC` 값, 바퀴 수(2 잠정)는 콘텐츠 설계·플레이 점검에서 정합니다. 형식은 확정입니다.
+1. **(해결, T043) `ActorPlan` 형식**: `pedestrianSignal` 하나를 더해 세 상황을 표현합니다. signal-wait = 차 신호 + 짝 보행자 신호, 보행자 출발 `pedestrianGreen` / crossing-check = 차 신호 + 짝 보행자 신호(사용자 결정 2026-10-12), 단계 `stop → wait(pedestriansClear) → wait(vehicleGreen) → go`, 출발 `playerStopped` / turning-car = 회전 방향 횡단보도의 보행자 신호만(`signal: null`, 초록 고정), 출발 `playerStopped`(사용자 결정 2026-10-12). 두 상황 모두 정지선을 횡단보도 앞 가장자리에 둠(T053·T054). turning-car 정지 구역은 회전하기 전(차체 앞 끝 40 m, 모퉁이 직전)부터 정지선까지이고, 교차로는 네거리라 회전 대신 직진하면 방향 안내 → 구간 다시(FR-034)(사용자 결정 2026-10-12).
+2. **값 미정**: `EXTRAS_PER_VIEW`, `durationTicks`, `introTicks`, `EXPLAIN_TICKS`, `IDLE_HINT_TICKS`, `DEMO_AFTER_FAILS`, `STUCK_TICKS`, `CONTACT_SLOW_TICKS`, `COUNTDOWN_TICKS`, `POSE_TICKS`, `WALK_SPEED`, `FLASH_TICKS`, `STOP_MARGIN`, `WAY_OFFSET`, `LEAVE_OFFSET`, `LEAVE_BACK`, `DRIVING_SPEC` 값, 바퀴 수(2 잠정)는 콘텐츠 설계·플레이 점검에서 정합니다. 형식은 확정입니다.
 3. **(해결, 리더 결정 B17) `AiProfile.targetSpeedRatio`와 FR-054**: 목표 속도 비율은 "액셀을 언제 떼는지"라는 주행 방식이고 성능 한도(`DRIVING_SPEC`)는 모든 차가 같으므로 FR-054(난이도는 주행 경로와 반응으로 조절)에 맞습니다. 필드를 유지합니다.
 4. **다른 차량의 탑승객**: 컴퓨터 차량·마을 차량에 탑승객을 태울지와 어떤 모델을 쓸지는 콘텐츠 설계 결정입니다(FR-096). 정해지면 그 차를 놓는 데이터(`AiProfile` 또는 `ScenePropPlacement`)에 `passengers: CharacterKindId[]`를 더합니다.
 5. **좌석이 보이는지**: 왜건·트럭 운전석처럼 지붕이 있는 차에서 `seats[0]`의 탑승객이 뒤에서 내려다보는 카메라에 보이는지는 모델 렌더링 점검 항목입니다(02 결정 A2). 안 보이면 장난감 같은 표현(열린 칸·지붕 위 좌석)으로 `seats` 값을 조정합니다.

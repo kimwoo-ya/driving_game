@@ -102,6 +102,8 @@ export function restingAt(pose: Pose): DriveState;
 ```ts
 /** 마을 건물 구역(Rect)에 차체 원이 들어가면 막고 감속한다. */
 export function blockByAreas(prev: DriveState, next: DriveState, blockers: readonly Rect[]): { state: DriveState; hit: boolean };
+/** (신규) 차체 원(bodyRadius)과 사각형이 겹치는지. 보도 진입 판정(scenario.ts)에서도 씁니다. */
+export function overlaps(s: DriveState, r: Rect): boolean;
 /** 트랙 중심선에서 폭 밖으로 나가는 이동을 벽에서 막고 감속한다. */
 export function blockByTrackWalls(prev: DriveState, next: DriveState, track: TrackDef): { state: DriveState; hit: boolean };
 /** 차체 원끼리 겹친 만큼 떼어 놓고, 닿은 차를 표시한다. */
@@ -148,7 +150,8 @@ export function stepTownActors(a: {                                             
 
 | 항목 | 약속 |
 |---|---|
-| 시그니처 | **잠정**. `ActorPlan` 형식이 잠정이라(data-model.md Open Issues 1) 연습 엔진 첫 태스크에서 함께 확정합니다. 아래 보장은 확정입니다. |
+| 시그니처 | 확정(T043). `ActorPlan`에 `pedestrianSignal`을 더했습니다(data-model.md 2.1, Open Issues 1 해결). |
+| `stoppedTicks` | stop 단계를 마친(stopZone에서 멈춘) 뒤 지난 운전 틱. 한 구간 시도 안에서 줄지 않아야 합니다(줄면 진행 신호 뒤 차 신호가 다시 노랑이 됨). scenario.ts가 `ScenarioAttempt.stoppedTicks`로 넘깁니다. |
 | FR-040 | 신호 변화는 주기가 아니라 플레이어 상태(`frontS`, `stoppedTicks`)로만 일어납니다. 멈출지 지나갈지 애매한 순간이 없습니다. |
 | FR-039, FR-036 | 보행자는 플레이어가 멈췄거나(`speed === 0`) 멈출 수 있는 거리(최고 속도 제동 거리 + 여유)일 때만 `crossing`을 시작합니다. |
 | FR-042 | 같은 횡단보도를 직진으로 지나는 차량 신호 초록과 보행자 신호 초록은 동시에 켜지지 않습니다. |
@@ -175,6 +178,7 @@ export function stepDrivingLesson(state: DrivingLessonState, input: DriveInput, 
 | 순서 | `steer → accel → brake → reverse` 고정. 각 단계는 그 조작을 직접 했을 때만 넘어갑니다: 조향 `input.steer ≠ 0`, 액셀 `speed > 0`, 브레이크 움직이던 차가 브레이크로 `speed === 0`, 후진 `requestGearToggle` 수락(FR-027). |
 | 안내 | 시작과 단계가 바뀔 때 `hint`(repeat: false), 무입력이 `IDLE_HINT_TICKS`마다 `hint`(repeat: true). 실패·시간제한 없음(FR-031, FR-038). |
 | 끝 | 마지막 단계를 마친 틱에 `lessonDone` 1회. 그 뒤 step은 no-op. flow가 `RunState.drivingLessonDone = true`. 레이싱 열림과 무관(FR-027). |
+| 후진 탭 | 후진 단계 전에는 `gearTap`을 받지 않습니다(멈춰 있어도 기어 그대로, 요청을 기억하지 않음). 움직이는 중 탭이면 어느 단계든 flow가 "먼저 멈춰요"를 보입니다(events.md 6장). 조작 익히기에서는 data-model.md 4.6 일반 전이보다 이 약속이 우선합니다. |
 
 ### 4.4 `src/practice/scenario.ts` — 안전 상황
 
@@ -444,7 +448,7 @@ export function watchLifecycle(on: (signal: LifecycleSignal) => void): void;
 | `src/content/track.ts` | `TrackDef`, `Checkpoint`, `AiProfile`, `TRACK` |
 | `src/content/voice.ts` | `VoiceLineId`, `VOICE_LINES`, `VIOLATION_LINES` |
 | `src/content/credits.ts` | `Credit`, `CreditId`, `CREDITS` |
-| `src/practice/townActors.ts` | `SignalState`, `TownPedestrian` |
+| `src/practice/townActors.ts` | `SignalState`, `TownPedestrian`, `POSE_TICKS`, `WALK_SPEED`, `FLASH_TICKS`, `STOP_MARGIN` |
 | `src/practice/drivingLesson.ts` | `DrivingLessonState`, `DrivingLessonEvent` |
 | `src/practice/scenario.ts` | `ScenarioAttempt`, `ScenarioEvent`, `HintCue`, `IDLE_HINT_TICKS`, `DEMO_AFTER_FAILS`, `EXPLAIN_TICKS` |
 | `src/practice/ruleRotation.ts` | `EXTRAS_PER_VIEW` |
